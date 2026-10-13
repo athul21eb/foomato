@@ -1,6 +1,6 @@
-# Hakcathon Backend
+# foomatoo frontend and backend microservices
 
-NestJS 11 project. Express adapter.
+
 
 ## Role
 
