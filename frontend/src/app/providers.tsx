@@ -1,5 +1,7 @@
 import React from 'react';
+import { Provider } from 'react-redux';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { store } from './store';
 import { ThemeProvider } from '../context/theme-context';
 import { ToastProvider } from '../context/toast-context';
 import { AuthProvider } from '../context/auth-context';
@@ -12,12 +14,14 @@ export const AppProviders: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <ThemeProvider>
-        <ToastProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ToastProvider>
-      </ThemeProvider>
-    </GoogleOAuthProvider>
+    <Provider store={store}>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <ThemeProvider>
+          <ToastProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
+      </GoogleOAuthProvider>
+    </Provider>
   );
 };

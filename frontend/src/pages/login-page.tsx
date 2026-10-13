@@ -2,23 +2,23 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UtensilsCrossed, ShieldAlert } from 'lucide-react';
 import { GoogleLoginBtn } from '../features/auth/components/google-login-btn';
-import { useAuth } from '../context/auth-context';
-import { useTheme } from '../context/theme-context';
+import { useAuth } from '../context/use-auth';
+import { useTheme } from '../context/use-theme';
 
 export const LoginPage: React.FC = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isLoading && isAuthenticated) {
       if (!user?.role) {
         navigate('/select-role');
       } else {
         navigate('/');
       }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, isLoading, user, navigate]);
 
   return (
     <div

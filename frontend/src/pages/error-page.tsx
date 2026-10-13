@@ -1,7 +1,7 @@
 import React from 'react';
 import { useRouteError, isRouteErrorResponse, Link } from 'react-router-dom';
 import { AlertOctagon, RotateCcw } from 'lucide-react';
-import { useTheme } from '../context/theme-context';
+import { useTheme } from '../context/use-theme';
 
 export const ErrorPage: React.FC = () => {
   const error = useRouteError();

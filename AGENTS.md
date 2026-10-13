@@ -11,9 +11,56 @@ patterns and architecture decisions, not generic Node.js approaches.
 
 ---frontend
 
-refer this project 
-https://github.com/athul21eb/E-COMMERCE-PROJECT-FRONTEND
+refer this for redux toolkit
+https://github.com/athul21eb/E-COMMERCE-PROJECT-FRONTEND.
 
+frontend/src/
+├── app/                        # App initialization, Providers & Router
+│   ├── router.tsx              # React Router setup & route definitions
+│   └── providers.tsx           # Global Providers (Auth, Theme, Toast, QueryClient)
+│
+├── assets/                     # Static media (logos, svgs, illustrations)
+│
+├── components/                 # Global, reusable UI components (dumb/presentational)
+│   ├── ui/                     # Primitives (Button, Input, Card, Modal, Spinner)
+│   ├── feedback/               # Toast, Alert, Skeleton
+│   └── common/                 # Header, Footer, ThemeToggle
+│
+├── context/                    # App-wide global state
+│   ├── auth-context.tsx        # User session, JWT tokens, logout
+│   └── theme-context.tsx       # Dark / Light mode state
+│
+├── features/                   # 🚀 Core Business Domains (Vertical Slices)
+│   ├── auth/                   # Authentication feature
+│   │   ├── api/                # API calls (googleLogin, updateRole, refreshToken)
+│   │   ├── components/         # Feature-specific UI (GoogleLoginBtn, RoleSelectModal)
+│   │   ├── hooks/              # Custom hooks (useAuth, useRole)
+│   │   └── types/              # Feature types (AuthUser, Role, AuthResponse)
+│   │
+│   ├── restaurant/             # (Future: Restaurant listing, menus)
+│   │   ├── api/
+│   │   ├── components/
+│   │   └── types/
+│   │
+│   └── orders/                 # (Future: Cart, checkout, tracking)
+│
+├── layouts/                    # Layout shells wrapping pages
+│   ├── root-layout.tsx         # Navbar + ThemeToggle + <Outlet /> + Footer
+│   └── auth-layout.tsx         # Centered card layout for login/onboarding
+│
+├── pages/                      # Page components (Route targets only - lean & clean)
+│   ├── home-page.tsx
+│   ├── login-page.tsx
+│   ├── select-role-page.tsx
+│   ├── not-found-page.tsx      # 404 Error page
+│   └── error-page.tsx          # General fallback / ErrorBoundary page
+│
+├── lib/                        # Third-party client instances & utilities
+│   ├── api-client.ts           # Axios / fetch instance with JWT interceptors
+│   └── utils.ts                # Tailwind merge (clsx / twMerge) & helpers
+│
+└── types/                      # Global cross-cutting TypeScript definitions
+    └── api.ts                  # Standard ApiResponse<T> interface
 
 
 

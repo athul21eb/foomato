@@ -1,4 +1,5 @@
 import type { ApiResponse } from '../types/api';
+import { store } from '../app/store';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -10,7 +11,7 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const token = localStorage.getItem('accessToken');
+  const token = store.getState().auth?.authInfo?.accessToken;
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -22,6 +23,7 @@ export async function apiClient<T>(
   }
 
   const config: RequestInit = {
+    credentials: 'include',
     ...options,
     headers,
   };

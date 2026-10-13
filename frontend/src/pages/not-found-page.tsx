@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, ArrowLeft } from 'lucide-react';
-import { useTheme } from '../context/theme-context';
+import { useTheme } from '../context/use-theme';
 
 export const NotFoundPage: React.FC = () => {
   const { theme } = useTheme();

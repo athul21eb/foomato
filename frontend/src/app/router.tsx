@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { RootLayout } from '../layouts/root-layout';
 import { AuthLayout } from '../layouts/auth-layout';
 import { HomePage } from '../pages/home-page';
+import { CustomerAccountPage } from '../pages/customer/account-page';
 import { LoginPage } from '../pages/login-page';
 import { SelectRolePage } from '../pages/select-role-page';
 import { NotFoundPage } from '../pages/not-found-page';
@@ -16,6 +17,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <HomePage />,
+      },
+      {
+        path: 'account',
+        element: <CustomerAccountPage />,
       },
     ],
   },

@@ -2,23 +2,28 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { RoleSelectCards } from '../features/auth/components/role-select-cards';
-import { useAuth } from '../context/auth-context';
-import { useTheme } from '../context/theme-context';
+import { useAuth } from '../context/use-auth';
+import { useTheme } from '../context/use-theme';
 
 export const SelectRolePage: React.FC = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        navigate('/login', { replace: true });
+      } else if (user?.role) {
+        // Once a role is selected, the user cannot change it again
+        navigate('/', { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, user?.role, navigate]);
 
   return (
     <div
-      className={`p-8 sm:p-10 rounded-3xl border backdrop-blur-2xl transition-all duration-300 shadow-2xl max-w-xl mx-auto ${
+      className={`w-full max-w-4xl mx-auto p-5 sm:p-8 lg:p-10 rounded-3xl border backdrop-blur-2xl transition-all duration-300 shadow-2xl ${
         theme === 'dark'
           ? 'bg-zinc-900/80 border-zinc-800/90 text-white shadow-black/60'
           : 'bg-white/90 border-zinc-200/90 text-zinc-900 shadow-zinc-300/40'

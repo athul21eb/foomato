@@ -1,9 +1,9 @@
 import React from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../context/auth-context';
+import { useAuth } from '../../../context/use-auth';
 import { useToast } from '../../../context/use-toast';
-import { useTheme } from '../../../context/theme-context';
+import { useTheme } from '../../../context/use-theme';
 import { Sparkles, ShieldCheck } from 'lucide-react';
 
 export const GoogleLoginBtn: React.FC = () => {
