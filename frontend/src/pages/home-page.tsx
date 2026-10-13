@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   UtensilsCrossed,
   ArrowRight,
@@ -28,6 +28,7 @@ import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { fetchCurrentLocation } from "../slices/location/locationSlice";
 import { toast } from "sonner";
 import { LocationModal } from "../components/ui/location-modal";
+import { LoadingScreen } from "../components/feedback/loading-screen";
 
 interface CategoryItem {
   id: string;
@@ -161,14 +162,26 @@ const FEATURED_RESTAURANTS: RestaurantItem[] = [
 ];
 
 export const HomePage: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { theme } = useTheme();
   const dispatch = useAppDispatch();
   const locationState = useAppSelector((state) => state.location);
+  const navigate = useNavigate();
 
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+
+  // If a seller or rider visits the consumer home page, smoothly redirect to their dedicated dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user?.role) {
+      if (user.role === "seller") {
+        navigate("/seller", { replace: true });
+      } else if (user.role === "rider") {
+        navigate("/rider", { replace: true });
+      }
+    }
+  }, [isAuthenticated, isLoading, user?.role, navigate]);
 
   // Auto-fetch location if not loaded yet
   useEffect(() => {
@@ -196,6 +209,20 @@ export const HomePage: React.FC = () => {
     "Offers & Deals",
     "Pure Veg",
   ];
+
+  if (
+    !isLoading &&
+    isAuthenticated &&
+    (user?.role === "seller" || user?.role === "rider")
+  ) {
+    return (
+      <LoadingScreen
+        fullScreen={false}
+        message={`Redirecting to ${user.role === "seller" ? "Seller Hub" : "Rider Hub"}...`}
+        subtext="Taking you to your dedicated management workspace"
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 pb-16">

@@ -1,6 +1,6 @@
 import React from "react";
 import { Outlet, Link } from "react-router-dom";
-import { UtensilsCrossed } from "lucide-react";
+
 import { ThemeToggle } from "../components/common/theme-toggle";
 import { useTheme } from "../context/use-theme";
 import { useAuth } from "../context/use-auth";
@@ -29,19 +29,27 @@ export const AuthLayout: React.FC = () => {
       <header className="w-full max-w-5xl mx-auto pt-6 pb-2 flex items-center justify-between z-10">
         {isRolePending ?
           <div
-            className="flex items-center gap-2.5  select-none opacity-90"
+            className="flex items-center gap-2.5 select-none opacity-90"
             title="Please select a role to proceed"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white shadow-md shadow-orange-500/20">
-              <UtensilsCrossed className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-orange-500/20">
+              <img
+                src="/foomato.png"
+                alt="Foomato"
+                className="w-full h-full object-contain"
+              />
             </div>
             <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
               Foomato
             </span>
           </div>
         : <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
-              <UtensilsCrossed className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
+              <img
+                src="/foomato.png"
+                alt="Foomato"
+                className="w-full h-full object-contain"
+              />
             </div>
             <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
               Foomato

@@ -22,6 +22,7 @@ import { useTheme } from '../../context/use-theme';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { fetchCurrentLocation } from '../../slices/location/locationSlice';
 import { LocationModal } from '../../components/ui/location-modal';
+import { LoadingScreen } from '../../components/feedback/loading-screen';
 import { toast } from 'sonner';
 
 interface SavedAddress {
@@ -139,7 +140,7 @@ const INITIAL_ORDERS: CustomerOrder[] = [
 type AccountTab = 'orders' | 'addresses' | 'logout';
 
 export const CustomerAccountPage: React.FC = () => {
-  const { user, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading, isLoggingOut, logout } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -178,8 +179,6 @@ export const CustomerAccountPage: React.FC = () => {
     notes: '',
   });
 
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
   // Sync addresses to localStorage
   useEffect(() => {
     try {
@@ -191,11 +190,20 @@ export const CustomerAccountPage: React.FC = () => {
 
   // Auth Guard
   useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
+    if (!isAuthLoading && !isAuthenticated && !isLoggingOut) {
       toast.error('Please sign in to view your account dashboard');
       navigate('/login', { replace: true });
     }
-  }, [isAuthenticated, isAuthLoading, navigate]);
+  }, [isAuthenticated, isAuthLoading, isLoggingOut, navigate]);
+
+  if (isLoggingOut) {
+    return (
+      <LoadingScreen
+        message="Signing out safely..."
+        subtext="Clearing your customer account session"
+      />
+    );
+  }
 
   const handleSetDefaultAddress = (id: string) => {
     setAddresses((prev) =>
@@ -256,15 +264,13 @@ export const CustomerAccountPage: React.FC = () => {
 
   const handlePerformLogout = async () => {
     try {
-      setIsLoggingOut(true);
-      logout();
+      const logoutTask = logout();
+      navigate('/login', { replace: true });
+      await logoutTask;
       toast.success('Successfully logged out of your account.');
-      navigate('/login');
     } catch {
       toast.error('Logout encountered an issue. Redirecting...');
-      navigate('/login');
-    } finally {
-      setIsLoggingOut(false);
+      navigate('/login', { replace: true });
     }
   };
 

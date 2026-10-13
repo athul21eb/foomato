@@ -43,6 +43,21 @@ export async function apiClient<T>(
   }
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      !endpoint.includes('/auth/token-refresh') &&
+      !endpoint.includes('/auth/login') &&
+      !endpoint.includes('/auth/google')
+    ) {
+      const { requestRefreshToken } = await import(
+        '../app/api/auth/authenticationApiSlice'
+      );
+      const newAccessToken = await requestRefreshToken(store.dispatch);
+      if (newAccessToken) {
+        return apiClient<T>(endpoint, options);
+      }
+    }
+
     const errorMsg =
       (responseData as { message?: string | string[] })?.message ||
       response.statusText ||

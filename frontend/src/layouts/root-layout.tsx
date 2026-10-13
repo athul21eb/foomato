@@ -4,10 +4,11 @@ import { Navbar } from '../components/common/navbar';
 import { Footer } from '../components/common/footer';
 import { useTheme } from '../context/use-theme';
 import { useAuth } from '../context/use-auth';
+import { LoadingScreen } from '../components/feedback/loading-screen';
 
 export const RootLayout: React.FC = () => {
   const { theme } = useTheme();
-  const { isAuthenticated, user, isLoading } = useAuth();
+  const { isAuthenticated, user, isLoading, isLoggingOut } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -16,6 +17,15 @@ export const RootLayout: React.FC = () => {
       navigate('/select-role', { replace: true });
     }
   }, [isAuthenticated, user?.role, isLoading, navigate]);
+
+  if (isLoggingOut) {
+    return (
+      <LoadingScreen
+        message="Signing out safely..."
+        subtext="Clearing your session and securing your workspace"
+      />
+    );
+  }
 
   return (
     <div

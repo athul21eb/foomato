@@ -32,7 +32,7 @@ const ROLES: RoleOption[] = [
   {
     id: 'seller',
     title: 'Restaurant Seller',
-    badge: 'Merchant',
+    badge: 'Seller',
     description: 'Manage menus, showcase your kitchen creations, and supercharge sales.',
     icon: Store,
   },
@@ -52,7 +52,13 @@ export const RoleSelectCards: React.FC = () => {
     try {
       await updateRole(selectedRole);
       success(`Role set to ${selectedRole.toUpperCase()}! Welcome aboard!`);
-      navigate('/');
+      if (selectedRole === 'seller') {
+        navigate('/seller');
+      } else if (selectedRole === 'rider') {
+        navigate('/rider');
+      } else {
+        navigate('/');
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Failed to update role';

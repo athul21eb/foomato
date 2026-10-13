@@ -23,9 +23,13 @@ export const GoogleLoginBtn: React.FC = () => {
       success(`Welcome back, ${user.name}!`);
 
       if (!user.role) {
-        navigate('/select-role');
+        navigate('/select-role', { replace: true });
+      } else if (user.role === 'seller') {
+        navigate('/seller', { replace: true });
+      } else if (user.role === 'rider') {
+        navigate('/rider', { replace: true });
       } else {
-        navigate('/');
+        navigate('/', { replace: true });
       }
     } catch (err: unknown) {
       const message =

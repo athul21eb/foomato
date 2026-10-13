@@ -33,6 +33,52 @@ const baseQuery = fetchBaseQuery({
 
 let refreshPromise: Promise<string | null> | null = null;
 
+export const requestRefreshToken = async (
+  dispatch: (action: unknown) => unknown,
+): Promise<string | null> => {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/token-refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const res = (await response.json()) as ApiResponse<AuthResponse>;
+          const data = res.data || (res as unknown as AuthResponse);
+          const { accessToken, user } = data;
+
+          if (accessToken) {
+            dispatch(SetAccessToken(accessToken));
+            if (user) {
+              dispatch(
+                SetCredentials({
+                  user,
+                  accessToken,
+                }),
+              );
+            }
+            return accessToken;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to refresh access token:', err);
+      }
+
+      dispatch(ClearCredentials());
+      return null;
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+};
+
 const baseQueryWithReAuth: BaseQueryFn<
   string | FetchArgs,
   unknown,
@@ -44,47 +90,10 @@ const baseQueryWithReAuth: BaseQueryFn<
   const isAuthRoute =
     requestUrl.includes('/auth/login') ||
     requestUrl.includes('/auth/google') ||
-    requestUrl.includes('/auth/token-refresh')
-    
+    requestUrl.includes('/auth/token-refresh');
+
   if (result.error && result.error.status === 401 && !isAuthRoute) {
-    if (!refreshPromise) {
-      refreshPromise = (async () => {
-        const refreshResult = await baseQuery(
-          {
-            url: '/auth/token-refresh',
-            method: 'POST',
-          },
-          api,
-          extraOptions,
-        );
-
-        if (refreshResult.data) {
-          const res = refreshResult.data as ApiResponse<AuthResponse>;
-          const data = res.data || (res as unknown as AuthResponse);
-          const { accessToken, user } = data;
-
-          if (accessToken) {
-            api.dispatch(SetAccessToken(accessToken));
-            if (user) {
-              api.dispatch(
-                SetCredentials({
-                  user,
-                  accessToken,
-                }),
-              );
-            }
-            return accessToken;
-          }
-        }
-
-        api.dispatch(ClearCredentials());
-        return null;
-      })().finally(() => {
-        refreshPromise = null;
-      });
-    }
-
-    const newAccessToken = await refreshPromise;
+    const newAccessToken = await requestRefreshToken(api.dispatch);
 
     if (newAccessToken) {
       result = await baseQuery(args, api, extraOptions);

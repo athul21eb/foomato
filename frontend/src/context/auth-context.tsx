@@ -7,7 +7,9 @@ import {
   useTokenRefreshMutation,
   useLogoutMutation,
 } from '../slices/auth/authApiSlice';
-import { SetCheckingAuth } from '../slices/auth/authSlice';
+import { ClearCredentials, SetCheckingAuth } from '../slices/auth/authSlice';
+import { apiSlice } from '../app/api/auth/authenticationApiSlice';
+import { sellerApiSlice } from '../slices/seller/sellerApiSlice';
 import { AuthContext } from './use-auth';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -19,6 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const isCheckingAuth = useAppSelector((state) => state.auth.isCheckingAuth);
 
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [tokenRefresh] = useTokenRefreshMutation();
   const [googleSignIn, { isLoading: isGoogleLoading }] =
     useGoogleSignInMutation();
@@ -50,8 +53,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return res.user;
   };
 
-  const logout = () => {
-    logoutMutation();
+  const logout = async (): Promise<void> => {
+    setIsLoggingOut(true);
+    try {
+      // 1. Immediately wipe local auth credentials synchronously to prevent any bounce/redirect glitch
+      dispatch(ClearCredentials());
+
+      // 2. Clear RTK Query caches
+      dispatch(apiSlice.util.resetApiState());
+      dispatch(sellerApiSlice.util.resetApiState());
+
+      // 3. Tell backend to clear the httpOnly refreshToken cookie
+      await logoutMutation().unwrap();
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -61,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         token,
         isAuthenticated: !!token && !!user,
         isLoading,
+        isLoggingOut,
         loginWithGoogle,
         updateRole,
         logout,

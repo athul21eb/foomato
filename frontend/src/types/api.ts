@@ -4,3 +4,10 @@ export interface ApiResponse<T> {
   message: string;
   data: T;
 }
+
+export interface ApiErrorResponse {
+  statusCode?: number;
+  message?: string | string[];
+  error?: string;
+  errors?: Record<string, string[]>;
+}
