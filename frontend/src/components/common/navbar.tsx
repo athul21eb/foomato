@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   User as UserIcon,
   Shield,
   ShoppingBag,
   Store,
   Bike,
-  LayoutDashboard,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../context/use-auth';
@@ -25,9 +24,6 @@ interface RoleNavProps {
 const SellerNavbar: React.FC<RoleNavProps> = ({ onOpenLogout }) => {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const location = useLocation();
-
-  const isDashboard = location.pathname === '/seller';
 
   return (
     <header
@@ -57,25 +53,10 @@ const SellerNavbar: React.FC<RoleNavProps> = ({ onOpenLogout }) => {
               </span>
             </div>
             <span className="text-[10px] uppercase tracking-wider font-semibold opacity-60">
-              Kitchen & Restaurant Management
+              seller Management
             </span>
           </div>
         </Link>
-
-        {/* Minimal Navigation Links */}
-        <nav className="hidden sm:flex items-center gap-2">
-          <Link
-            to="/seller"
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              isDashboard
-                ? 'bg-orange-500/15 text-orange-500 border border-orange-500/30'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-orange-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Store Dashboard</span>
-          </Link>
-        </nav>
 
         {/* Right Controls */}
         <div className="flex items-center gap-3">

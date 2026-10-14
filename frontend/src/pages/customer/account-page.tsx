@@ -24,6 +24,12 @@ import { fetchCurrentLocation } from '../../slices/location/locationSlice';
 import { LocationModal } from '../../components/ui/location-modal';
 import { LoadingScreen } from '../../components/feedback/loading-screen';
 import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  deliveryAddressSchema,
+  type DeliveryAddressFormValues,
+} from '../../features/customer/schemas/customer.schema';
 
 interface SavedAddress {
   id: string;
@@ -159,24 +165,25 @@ export const CustomerAccountPage: React.FC = () => {
   });
 
   const [isAddingAddress, setIsAddingAddress] = useState(false);
-  const [newAddressForm, setNewAddressForm] = useState<{
-    tag: 'Home' | 'Work' | 'Other';
-    label: string;
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    phone: string;
-    notes: string;
-  }>({
-    tag: 'Home',
-    label: 'Home Apartment',
-    street: '',
-    city: '',
-    state: 'Kerala',
-    zipCode: '',
-    phone: '',
-    notes: '',
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<DeliveryAddressFormValues>({
+    resolver: zodResolver(deliveryAddressSchema),
+    defaultValues: {
+      tag: 'Home',
+      label: 'Home Apartment',
+      street: '',
+      city: '',
+      state: 'Kerala',
+      zipCode: '',
+      phone: '',
+      notes: '',
+    },
   });
 
   // Sync addresses to localStorage
@@ -227,29 +234,23 @@ export const CustomerAccountPage: React.FC = () => {
     }
   };
 
-  const handleSaveNewAddress = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAddressForm.street.trim() || !newAddressForm.city.trim()) {
-      toast.error('Please enter street address and city.');
-      return;
-    }
-
+  const handleSaveNewAddress = (data: DeliveryAddressFormValues) => {
     const created: SavedAddress = {
-      id: `addr-${Date.now()}`,
-      tag: newAddressForm.tag,
-      label: newAddressForm.label.trim() || `${newAddressForm.tag} Address`,
-      street: newAddressForm.street.trim(),
-      city: newAddressForm.city.trim(),
-      state: newAddressForm.state.trim() || 'Kerala',
-      zipCode: newAddressForm.zipCode.trim() || '680001',
-      phone: newAddressForm.phone.trim() || '+91 98470 00000',
+      id: `addr-${crypto.randomUUID()}`,
+      tag: data.tag,
+      label: data.label.trim() || `${data.tag} Address`,
+      street: data.street.trim(),
+      city: data.city.trim(),
+      state: data.state.trim() || 'Kerala',
+      zipCode: data.zipCode?.trim() || '680001',
+      phone: data.phone?.trim() || '+91 98470 00000',
       isDefault: addresses.length === 0,
-      notes: newAddressForm.notes.trim(),
+      notes: data.notes?.trim() || '',
     };
 
     setAddresses((prev) => [created, ...prev]);
     setIsAddingAddress(false);
-    setNewAddressForm({
+    reset({
       tag: 'Home',
       label: 'Home Apartment',
       street: '',
@@ -673,7 +674,8 @@ export const CustomerAccountPage: React.FC = () => {
             {/* Expandable Add Address Form */}
             {isAddingAddress && (
               <form
-                onSubmit={handleSaveNewAddress}
+                noValidate
+                onSubmit={handleSubmit(handleSaveNewAddress)}
                 className={`p-6 rounded-2xl border shadow-xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 ${
                   theme === 'dark'
                     ? 'bg-zinc-900 border-zinc-700/80 shadow-black/50'
@@ -702,15 +704,11 @@ export const CustomerAccountPage: React.FC = () => {
                       Address Tag
                     </label>
                     <select
-                      value={newAddressForm.tag}
-                      onChange={(e) =>
-                        setNewAddressForm((prev) => ({
-                          ...prev,
-                          tag: e.target.value as 'Home' | 'Work' | 'Other',
-                        }))
-                      }
+                      {...register('tag')}
                       className={`w-full p-2.5 rounded-xl text-xs border outline-none font-medium transition-colors ${
-                        theme === 'dark'
+                        errors.tag
+                          ? 'border-red-500 bg-red-500/10'
+                          : theme === 'dark'
                           ? 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-orange-500'
                           : 'bg-white border-zinc-300 text-zinc-900 focus:border-orange-500'
                       }`}
@@ -719,25 +717,30 @@ export const CustomerAccountPage: React.FC = () => {
                       <option value="Work">Work</option>
                       <option value="Other">Other</option>
                     </select>
+                    {errors.tag && (
+                      <p className="text-red-500 text-[11px] mt-1">{errors.tag.message}</p>
+                    )}
                   </div>
 
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                      Label / Nickname
+                      Label / Nickname *
                     </label>
                     <input
                       type="text"
                       placeholder="e.g. Swaraj Round Home or Infopark Desk"
-                      value={newAddressForm.label}
-                      onChange={(e) =>
-                        setNewAddressForm((prev) => ({ ...prev, label: e.target.value }))
-                      }
+                      {...register('label')}
                       className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                        theme === 'dark'
+                        errors.label
+                          ? 'border-red-500 bg-red-500/10'
+                          : theme === 'dark'
                           ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
                           : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
                       }`}
                     />
+                    {errors.label && (
+                      <p className="text-red-500 text-[11px] mt-1">{errors.label.message}</p>
+                    )}
                   </div>
                 </div>
 
@@ -748,18 +751,19 @@ export const CustomerAccountPage: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      required
                       placeholder="e.g. Round South, Near Ragam Theatre"
-                      value={newAddressForm.street}
-                      onChange={(e) =>
-                        setNewAddressForm((prev) => ({ ...prev, street: e.target.value }))
-                      }
+                      {...register('street')}
                       className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                        theme === 'dark'
+                        errors.street
+                          ? 'border-red-500 bg-red-500/10'
+                          : theme === 'dark'
                           ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
                           : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
                       }`}
                     />
+                    {errors.street && (
+                      <p className="text-red-500 text-[11px] mt-1">{errors.street.message}</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -769,37 +773,40 @@ export const CustomerAccountPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        required
                         placeholder="e.g. Thrissur"
-                        value={newAddressForm.city}
-                        onChange={(e) =>
-                          setNewAddressForm((prev) => ({ ...prev, city: e.target.value }))
-                        }
+                        {...register('city')}
                         className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          theme === 'dark'
+                          errors.city
+                            ? 'border-red-500 bg-red-500/10'
+                            : theme === 'dark'
                             ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
                             : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
                         }`}
                       />
+                      {errors.city && (
+                        <p className="text-red-500 text-[11px] mt-1">{errors.city.message}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        State / Province
+                        State / Province *
                       </label>
                       <input
                         type="text"
                         placeholder="e.g. Kerala"
-                        value={newAddressForm.state}
-                        onChange={(e) =>
-                          setNewAddressForm((prev) => ({ ...prev, state: e.target.value }))
-                        }
+                        {...register('state')}
                         className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          theme === 'dark'
+                          errors.state
+                            ? 'border-red-500 bg-red-500/10'
+                            : theme === 'dark'
                             ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
                             : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
                         }`}
                       />
+                      {errors.state && (
+                        <p className="text-red-500 text-[11px] mt-1">{errors.state.message}</p>
+                      )}
                     </div>
 
                     <div>
@@ -809,16 +816,18 @@ export const CustomerAccountPage: React.FC = () => {
                       <input
                         type="text"
                         placeholder="e.g. 680001"
-                        value={newAddressForm.zipCode}
-                        onChange={(e) =>
-                          setNewAddressForm((prev) => ({ ...prev, zipCode: e.target.value }))
-                        }
+                        {...register('zipCode')}
                         className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          theme === 'dark'
+                          errors.zipCode
+                            ? 'border-red-500 bg-red-500/10'
+                            : theme === 'dark'
                             ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
                             : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
                         }`}
                       />
+                      {errors.zipCode && (
+                        <p className="text-red-500 text-[11px] mt-1">{errors.zipCode.message}</p>
+                      )}
                     </div>
                   </div>
 
@@ -830,16 +839,18 @@ export const CustomerAccountPage: React.FC = () => {
                       <input
                         type="tel"
                         placeholder="+91 98470 00000"
-                        value={newAddressForm.phone}
-                        onChange={(e) =>
-                          setNewAddressForm((prev) => ({ ...prev, phone: e.target.value }))
-                        }
+                        {...register('phone')}
                         className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          theme === 'dark'
+                          errors.phone
+                            ? 'border-red-500 bg-red-500/10'
+                            : theme === 'dark'
                             ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
                             : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
                         }`}
                       />
+                      {errors.phone && (
+                        <p className="text-red-500 text-[11px] mt-1">{errors.phone.message}</p>
+                      )}
                     </div>
 
                     <div>
@@ -849,16 +860,18 @@ export const CustomerAccountPage: React.FC = () => {
                       <input
                         type="text"
                         placeholder="e.g. Buzz doorbell, leave at doorstep"
-                        value={newAddressForm.notes}
-                        onChange={(e) =>
-                          setNewAddressForm((prev) => ({ ...prev, notes: e.target.value }))
-                        }
+                        {...register('notes')}
                         className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          theme === 'dark'
+                          errors.notes
+                            ? 'border-red-500 bg-red-500/10'
+                            : theme === 'dark'
                             ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
                             : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
                         }`}
                       />
+                      {errors.notes && (
+                        <p className="text-red-500 text-[11px] mt-1">{errors.notes.message}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -866,7 +879,10 @@ export const CustomerAccountPage: React.FC = () => {
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-500/10">
                   <button
                     type="button"
-                    onClick={() => setIsAddingAddress(false)}
+                    onClick={() => {
+                      setIsAddingAddress(false);
+                      reset();
+                    }}
                     className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
                       theme === 'dark'
                         ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
@@ -1048,13 +1064,10 @@ export const CustomerAccountPage: React.FC = () => {
         onClose={() => setIsLocationModalOpen(false)}
         confirmButtonText="Use For Address Form"
         onConfirm={(loc) => {
-          setNewAddressForm((prev) => ({
-            ...prev,
-            street: loc.address || prev.street,
-            city: loc.city || prev.city,
-            state: loc.state || prev.state,
-            zipCode: loc.zipCode || prev.zipCode,
-          }));
+          if (loc.address) setValue('street', loc.address, { shouldValidate: true });
+          if (loc.city) setValue('city', loc.city, { shouldValidate: true });
+          if (loc.state) setValue('state', loc.state, { shouldValidate: true });
+          if (loc.zipCode) setValue('zipCode', loc.zipCode, { shouldValidate: true });
           toast.success('Address auto-filled from detected location!');
         }}
       />

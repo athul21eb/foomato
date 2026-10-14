@@ -37,7 +37,7 @@ frontend/src/
 │   │   ├── hooks/              # Custom hooks (useAuth, useRole)
 │   │   └── types/              # Feature types (AuthUser, Role, AuthResponse)
 │   │
-│   ├── restaurant/             # (Future: Restaurant listing, menus)
+│   ├── seller/             # (Future: seller listing, menus)
 │   │   ├── api/
 │   │   ├── components/
 │   │   └── types/

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './lib/database/database.module';
 import { JwtModule } from './lib/jwt/jwt.module';
 import { SellerModule } from './module/seller/seller.module';
+import { MenuItemModule } from './module/menu-item/menu-item.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { SellerModule } from './module/seller/seller.module';
     DatabaseModule,
     JwtModule,
     SellerModule,
+    MenuItemModule,
   ],
 })
 export class AppModule {}

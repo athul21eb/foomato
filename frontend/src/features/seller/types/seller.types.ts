@@ -48,3 +48,31 @@ export interface UploadResponse {
   height?: number;
   bytes?: number;
 }
+
+export interface MenuItem {
+  id: string;
+  sellerId: string;
+  name: string;
+  description?: string;
+  price: number;
+  image: string;
+  isVeg: boolean;
+  isAvailable: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateMenuItemDto {
+  name: string;
+  description?: string;
+  price: number;
+  image: string;
+  isVeg?: boolean;
+  isAvailable?: boolean;
+  sellerId?: string;
+}
+
+export interface UpdateMenuItemStatusDto {
+  isAvailable?: boolean;
+}
+

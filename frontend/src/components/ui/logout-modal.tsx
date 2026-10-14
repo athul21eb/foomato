@@ -34,7 +34,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
 
   const roleLabel =
     user?.role === 'seller'
-      ? 'Restaurant Seller'
+      ? 'Seller'
       : user?.role === 'rider'
       ? 'Delivery Partner'
       : user?.role === 'customer'

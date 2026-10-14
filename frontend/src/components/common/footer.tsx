@@ -10,138 +10,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/use-theme';
 import { useAuth } from '../../context/use-auth';
-import { Link } from 'react-router-dom';
-
-/**
- * Minimal Footer for Restaurant Sellers
- */
-const SellerFooter: React.FC = () => {
-  const { theme } = useTheme();
-
-  return (
-    <footer
-      className={`border-t transition-colors duration-300 py-8 ${
-        theme === 'dark'
-          ? 'bg-zinc-950 border-zinc-800/80 text-zinc-400'
-          : 'bg-zinc-50 border-zinc-200 text-zinc-600'
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Left: Brand & Portal Name */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl overflow-hidden shadow-xs shrink-0">
-              <img
-                src="/foomato.png"
-                alt="Foomato"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm tracking-tight text-zinc-900 dark:text-white">
-                  Foomato Seller Hub
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Operations Active
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Kitchen management, order dispatch, and menu controls.
-              </p>
-            </div>
-          </div>
-
-          {/* Center: Quick Links */}
-          <div className="flex items-center gap-6 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-            <Link to="/seller" className="hover:text-orange-500 transition-colors">
-              Dashboard
-            </Link>
-            <Link to="/seller/new" className="hover:text-orange-500 transition-colors">
-              New Store
-            </Link>
-            <span className="hover:text-orange-500 transition-colors cursor-pointer">
-              Seller Guidelines
-            </span>
-            <span className="hover:text-orange-500 transition-colors cursor-pointer">
-              Seller Support
-            </span>
-          </div>
-
-          {/* Right: Copyright */}
-          <div className="text-[11px] text-zinc-400 dark:text-zinc-500 text-center md:text-right">
-            © {new Date().getFullYear()} Foomato Technologies Inc. All rights reserved.
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-};
-
-/**
- * Minimal Footer for Delivery Riders
- */
-const RiderFooter: React.FC = () => {
-  const { theme } = useTheme();
-
-  return (
-    <footer
-      className={`border-t transition-colors duration-300 py-8 ${
-        theme === 'dark'
-          ? 'bg-zinc-950 border-zinc-800/80 text-zinc-400'
-          : 'bg-zinc-50 border-zinc-200 text-zinc-600'
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Left: Brand & Portal Name */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl overflow-hidden shadow-xs shrink-0">
-              <img
-                src="/foomato.png"
-                alt="Foomato"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm tracking-tight text-zinc-900 dark:text-white">
-                  Foomato Rider Fleet
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Fleet Network Online
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Delivery partner portal, routes, and earnings.
-              </p>
-            </div>
-          </div>
-
-          {/* Center: Quick Links */}
-          <div className="flex items-center gap-6 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-            <span className="hover:text-emerald-500 transition-colors cursor-pointer">
-              Safety Protocols
-            </span>
-            <span className="hover:text-emerald-500 transition-colors cursor-pointer">
-              Payout Policies
-            </span>
-            <span className="hover:text-emerald-500 transition-colors cursor-pointer">
-              Rider Support
-            </span>
-          </div>
-
-          {/* Right: Copyright */}
-          <div className="text-[11px] text-zinc-400 dark:text-zinc-500 text-center md:text-right">
-            © {new Date().getFullYear()} Foomato Technologies Inc. All rights reserved.
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-};
+import { Link, useLocation } from 'react-router-dom';
 
 /**
  * Standard Consumer / Customer Footer
@@ -353,13 +222,15 @@ const CustomerFooter: React.FC = () => {
 
 export const Footer: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
 
-  if (isAuthenticated && user?.role === 'seller') {
-    return <SellerFooter />;
-  }
-
-  if (isAuthenticated && user?.role === 'rider') {
-    return <RiderFooter />;
+  // Remove footer entirely for seller and rider roles, as well as on seller and rider portal routes
+  if (
+    (isAuthenticated && (user?.role === 'seller' || user?.role === 'rider')) ||
+    location.pathname.startsWith('/seller') ||
+    location.pathname.startsWith('/rider')
+  ) {
+    return null;
   }
 
   return <CustomerFooter />;

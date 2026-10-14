@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MapPin,
   Compass,
@@ -11,10 +11,9 @@ import {
   AlertCircle,
   ExternalLink,
   Search,
-  SlidersHorizontal,
-  Info,
   Loader2,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../../context/use-theme';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
@@ -22,6 +21,13 @@ import {
   fetchCurrentLocation,
   setManualLocation,
 } from '../../slices/location/locationSlice';
+import {
+  loadGoogleMaps,
+  isGoogleMapsReady,
+  getGoogleMapsApiKey,
+  reverseGeocodeGoogle,
+  parseAddressComponents,
+} from '../../lib/google-maps-loader';
 import { toast } from 'sonner';
 
 interface LocationModalProps {
@@ -38,64 +44,6 @@ interface LocationModalProps {
   confirmButtonText?: string;
 }
 
-interface QuickCity {
-  name: string;
-  city: string;
-  address: string;
-  state: string;
-  latitude: number;
-  longitude: number;
-  postalCode: string;
-}
-
-const REGIONAL_PRESETS: QuickCity[] = [
-  {
-    name: 'Thrissur',
-    city: 'Thrissur',
-    address: 'Swaraj Round, Thrissur',
-    state: 'Kerala',
-    latitude: 10.5276,
-    longitude: 76.2144,
-    postalCode: '680001',
-  },
-  {
-    name: 'Kochi',
-    city: 'Kochi',
-    address: 'Marine Drive, Ernakulam, Kochi',
-    state: 'Kerala',
-    latitude: 9.9312,
-    longitude: 76.2673,
-    postalCode: '682011',
-  },
-  {
-    name: 'Kozhikode',
-    city: 'Kozhikode',
-    address: 'SM Street, Kozhikode',
-    state: 'Kerala',
-    latitude: 11.2588,
-    longitude: 75.7804,
-    postalCode: '673001',
-  },
-  {
-    name: 'Trivandrum',
-    city: 'Thiruvananthapuram',
-    address: 'Statue, MG Road, Thiruvananthapuram',
-    state: 'Kerala',
-    latitude: 8.5241,
-    longitude: 76.9366,
-    postalCode: '695001',
-  },
-  {
-    name: 'Bengaluru',
-    city: 'Bengaluru',
-    address: 'Indiranagar, Bengaluru',
-    state: 'Karnataka',
-    latitude: 12.9716,
-    longitude: 77.5946,
-    postalCode: '560038',
-  },
-];
-
 interface NominatimResult {
   place_id: number;
   lat: string;
@@ -111,7 +59,15 @@ interface NominatimResult {
     country?: string;
     postcode?: string;
     road?: string;
+    neighbourhood?: string;
   };
+}
+
+interface GooglePrediction {
+  placeId: string;
+  description: string;
+  mainText?: string;
+  secondaryText?: string;
 }
 
 export const LocationModal: React.FC<LocationModalProps> = ({
@@ -126,14 +82,241 @@ export const LocationModal: React.FC<LocationModalProps> = ({
 
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [showIspExplanation, setShowIspExplanation] = useState(true);
+  const hasApiKey = Boolean(getGoogleMapsApiKey());
 
-  const siteHost =
-    import.meta.env.VITE_SITE_DOMAIN ||
-    import.meta.env.VITE_SITE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '') ||
-    (typeof window !== 'undefined' ? window.location.host : 'localhost:5173');
+  // Google Maps SDK states
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState<boolean>(() => isGoogleMapsReady());
+  const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(() => Boolean(hasApiKey && !isGoogleMapsReady()));
+  const [googlePredictions, setGooglePredictions] = useState<GooglePrediction[]>([]);
+  const [nominatimResults, setNominatimResults] = useState<NominatimResult[]>([]);
+
+  // Map DOM refs & instances
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerInstanceRef = useRef<google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null>(null);
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const updateLocationFromCoordsRef = useRef<(lat: number, lng: number) => Promise<void>>(() => Promise.resolve());
+
+  const updateMarkerPosition = useCallback((lat: number, lng: number) => {
+    const marker = markerInstanceRef.current;
+    if (!marker) return;
+    const latLng = { lat, lng };
+    if ('position' in marker) {
+      marker.position = latLng;
+    } else if (typeof (marker as google.maps.Marker).setPosition === 'function') {
+      (marker as google.maps.Marker).setPosition(latLng);
+    }
+  }, []);
+
+  // Load Google Maps SDK when modal opens if API key is provided
+  useEffect(() => {
+    if (!isOpen || !hasApiKey || isGoogleMapsReady()) return;
+
+    let isSubscribed = true;
+    loadGoogleMaps()
+      .then(() => {
+        if (isSubscribed) {
+          setGoogleMapsLoaded(true);
+          setIsGoogleLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('Google Maps SDK load error:', err);
+        if (isSubscribed) {
+          setIsGoogleLoading(false);
+        }
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isOpen, hasApiKey]);
+
+  // Handle Reverse Geocode and store location in Redux
+  const updateLocationFromCoords = useCallback(
+    async (lat: number, lng: number) => {
+      // 1. Immediately update Redux coordinates so Active Pin UI reflects click/drag instantaneously
+      dispatch(
+        setManualLocation({
+          latitude: lat,
+          longitude: lng,
+          city: 'Detecting...',
+          address: `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`,
+          country: null,
+          postalCode: null,
+          formattedAddress: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        }),
+      );
+
+      try {
+        if (googleMapsLoaded) {
+          const geocoded = await reverseGeocodeGoogle(lat, lng);
+          if (geocoded) {
+            dispatch(
+              setManualLocation({
+                latitude: geocoded.lat,
+                longitude: geocoded.lng,
+                city: geocoded.city,
+                address: geocoded.address,
+                country: geocoded.state || geocoded.country,
+                postalCode: geocoded.postalCode || null,
+                formattedAddress: geocoded.formattedAddress,
+              }),
+            );
+            toast.success(`Location set: ${geocoded.city || geocoded.address}`);
+            return;
+          }
+        }
+
+        // Fallback reverse geocoding with OpenStreetMap Nominatim
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
+          { headers: { Accept: 'application/json' } },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const city =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            data.address?.suburb ||
+            data.address?.county ||
+            'Selected Pin';
+          const road =
+            data.address?.road ||
+            data.address?.neighbourhood ||
+            data.display_name?.split(',')[0] ||
+            city;
+          dispatch(
+            setManualLocation({
+              latitude: lat,
+              longitude: lng,
+              city,
+              address: road,
+              country: data.address?.state || data.address?.country || null,
+              postalCode: data.address?.postcode || null,
+              formattedAddress: data.display_name,
+            }),
+          );
+          toast.success(`Location set: ${city}`);
+        }
+      } catch (err) {
+        console.warn('Reverse geocode error:', err);
+      }
+    },
+    [dispatch, googleMapsLoaded],
+  );
+
+  // Keep ref up to date to avoid stale closures in map event listeners
+  useEffect(() => {
+    updateLocationFromCoordsRef.current = updateLocationFromCoords;
+  }, [updateLocationFromCoords]);
+
+  // Track initial coordinates to center the map when modal opens
+  const initialCenterRef = useRef<{ lat: number; lng: number }>({
+    lat: locationState.coords?.latitude ?? 12.9716,
+    lng: locationState.coords?.longitude ?? 77.5946,
+  });
+
+  // Initialize interactive Google Map ONCE when modal is open and Google Maps is ready
+  useEffect(() => {
+    if (!isOpen || !googleMapsLoaded || !mapContainerRef.current) return;
+
+    const currentLat = initialCenterRef.current.lat;
+    const currentLng = initialCenterRef.current.lng;
+
+    // Reset references to ensure fresh initialization on newly mounted DOM node
+    mapInstanceRef.current = null;
+    markerInstanceRef.current = null;
+
+    // Create new Map instance with mapId required for AdvancedMarkerElement
+    const map = new google.maps.Map(mapContainerRef.current, {
+      center: { lat: currentLat, lng: currentLng },
+      zoom: 15,
+      mapId: 'foomato_location_picker',
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      zoomControl: true,
+      gestureHandling: 'greedy',
+    });
+    mapInstanceRef.current = map;
+
+    // Modern AdvancedMarkerElement to resolve deprecation warning
+    if (google.maps.marker?.AdvancedMarkerElement) {
+      const advMarker = new google.maps.marker.AdvancedMarkerElement({
+        position: { lat: currentLat, lng: currentLng },
+        map,
+        gmpDraggable: true,
+        title: 'Drag to adjust your location',
+      });
+      markerInstanceRef.current = advMarker;
+
+      advMarker.addListener('dragend', () => {
+        const pos = advMarker.position;
+        if (pos) {
+          const lat = typeof pos.lat === 'function' ? pos.lat() : Number(pos.lat);
+          const lng = typeof pos.lng === 'function' ? pos.lng() : Number(pos.lng);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            updateMarkerPosition(lat, lng);
+            updateLocationFromCoordsRef.current(lat, lng);
+          }
+        }
+      });
+    } else {
+      const legacyMarker = new google.maps.Marker({
+        position: { lat: currentLat, lng: currentLng },
+        map,
+        draggable: true,
+        animation: google.maps.Animation.DROP,
+        title: 'Drag to adjust your location',
+      });
+      markerInstanceRef.current = legacyMarker;
+
+      legacyMarker.addListener('dragend', () => {
+        const pos = legacyMarker.getPosition();
+        if (pos) {
+          const lat = pos.lat();
+          const lng = pos.lng();
+          updateMarkerPosition(lat, lng);
+          updateLocationFromCoordsRef.current(lat, lng);
+        }
+      });
+    }
+
+    // Handle map click to drop and move pin
+    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (e.latLng) {
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        updateMarkerPosition(lat, lng);
+        updateLocationFromCoordsRef.current(lat, lng);
+      }
+    });
+
+    // Ensure map tiles properly layout after mounting
+    const timer = setTimeout(() => {
+      if (mapInstanceRef.current) {
+        google.maps.event.trigger(mapInstanceRef.current, 'resize');
+      }
+    }, 120);
+
+    // Clean up instances when unmounting or closing modal
+    return () => {
+      clearTimeout(timer);
+      mapInstanceRef.current = null;
+      markerInstanceRef.current = null;
+    };
+  }, [isOpen, googleMapsLoaded, updateMarkerPosition]);
+
+  // Synchronize map center when coordinates change while modal is open
+  useEffect(() => {
+    if (!isOpen || !mapInstanceRef.current || !locationState.coords) return;
+    const { latitude, longitude } = locationState.coords;
+    mapInstanceRef.current.panTo({ lat: latitude, lng: longitude });
+    updateMarkerPosition(latitude, longitude);
+  }, [isOpen, locationState.coords, updateMarkerPosition]);
 
   if (!isOpen) return null;
 
@@ -142,6 +325,10 @@ export const LocationModal: React.FC<LocationModalProps> = ({
       toast.info('Querying browser GPS coordinates...');
       const res = await dispatch(fetchCurrentLocation()).unwrap();
       toast.success(`Location identified: ${res.city || res.address}`);
+      if (mapInstanceRef.current && res.latitude && res.longitude) {
+        mapInstanceRef.current.panTo({ lat: res.latitude, lng: res.longitude });
+        updateMarkerPosition(res.latitude, res.longitude);
+      }
     } catch (err: unknown) {
       toast.error(typeof err === 'string' ? err : 'Unable to retrieve location');
     }
@@ -164,28 +351,177 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSelectPreset = (preset: QuickCity) => {
-    dispatch(
-      setManualLocation({
-        latitude: preset.latitude,
-        longitude: preset.longitude,
-        city: preset.city,
-        address: preset.address,
-        country: preset.state,
-        postalCode: preset.postalCode,
-        formattedAddress: `${preset.address}, ${preset.state}`,
-      }),
-    );
-    toast.success(`Location set to ${preset.name}!`);
+  // Google Places Autocomplete query with Nominatim fallback
+  const handleQueryChange = (val: string) => {
+    setSearchQuery(val);
+    const trimmed = val.trim();
+    if (!trimmed) {
+      setGooglePredictions([]);
+      setNominatimResults([]);
+      return;
+    }
+
+    const isPincode = /^\d{6}$/.test(trimmed);
+
+    // If 6-digit Indian PIN code, directly query Nominatim postalcode endpoint
+    if (isPincode) {
+      fetch(
+        `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(
+          trimmed,
+        )}&countrycodes=in&format=json&addressdetails=1&limit=5`,
+        { headers: { Accept: 'application/json' } },
+      )
+        .then((res) => res.json())
+        .then((data: NominatimResult[]) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setNominatimResults(data);
+          }
+        })
+        .catch(() => {});
+    }
+
+    if (googleMapsLoaded && typeof google !== 'undefined' && google.maps.places) {
+      if (!autocompleteServiceRef.current) {
+        autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
+      }
+      autocompleteServiceRef.current.getPlacePredictions(
+        { input: val, componentRestrictions: { country: 'in' } },
+        (predictions, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
+            setGooglePredictions(
+              predictions.map((p) => ({
+                placeId: p.place_id,
+                description: p.description,
+                mainText: p.structured_formatting?.main_text,
+                secondaryText: p.structured_formatting?.secondary_text,
+              })),
+            );
+            if (!isPincode) {
+              setNominatimResults([]);
+            }
+          } else {
+            setGooglePredictions([]);
+            // If Google returned no predictions and not a pincode, search Nominatim for suggestions
+            if (!isPincode && trimmed.length >= 3) {
+              fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+                  trimmed,
+                )}&countrycodes=in&format=json&addressdetails=1&limit=5`,
+                { headers: { Accept: 'application/json' } },
+              )
+                .then((res) => res.json())
+                .then((data: NominatimResult[]) => {
+                  if (Array.isArray(data)) {
+                    setNominatimResults(data);
+                  }
+                })
+                .catch(() => {});
+            }
+          }
+        },
+      );
+    } else if (!isPincode && trimmed.length >= 3) {
+      fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          trimmed,
+        )}&countrycodes=in&format=json&addressdetails=1&limit=5`,
+        { headers: { Accept: 'application/json' } },
+      )
+        .then((res) => res.json())
+        .then((data: NominatimResult[]) => {
+          if (Array.isArray(data)) {
+            setNominatimResults(data);
+          }
+        })
+        .catch(() => {});
+    }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
+  // Execute explicit search submit (Pincode -> Google Geocoding -> Nominatim fallback)
+  const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
 
     setIsSearching(true);
-    const trimmed = searchQuery.trim();
     const isPincode = /^\d{6}$/.test(trimmed);
+
+    // 1. Direct Indian pincode lookup via Nominatim
+    if (isPincode) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(
+            trimmed,
+          )}&countrycodes=in&format=json&addressdetails=1&limit=5`,
+          { headers: { Accept: 'application/json' } },
+        );
+        if (res.ok) {
+          const data: NominatimResult[] = await res.json();
+          if (data && data.length > 0) {
+            handleSelectNominatimResult(data[0]);
+            setIsSearching(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Pincode search error:', err);
+      }
+    }
+
+    // 2. Google Geocoding Search
+    if (googleMapsLoaded && typeof google !== 'undefined') {
+      try {
+        const geocoder = new google.maps.Geocoder();
+        const googleResult = await new Promise<google.maps.GeocoderResult | null>((resolve) => {
+          const request: google.maps.GeocoderRequest = isPincode
+            ? { componentRestrictions: { country: 'IN', postalCode: trimmed } }
+            : { address: trimmed, componentRestrictions: { country: 'in' } };
+
+          geocoder.geocode(request, (results, status) => {
+            if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+              resolve(results[0]);
+            } else {
+              geocoder.geocode({ address: trimmed }, (fResults, fStatus) => {
+                if (fStatus === google.maps.GeocoderStatus.OK && fResults && fResults[0]) {
+                  resolve(fResults[0]);
+                } else {
+                  resolve(null);
+                }
+              });
+            }
+          });
+        });
+
+        if (googleResult) {
+          const geocoded = parseAddressComponents(googleResult, 0, 0);
+          dispatch(
+            setManualLocation({
+              latitude: geocoded.lat,
+              longitude: geocoded.lng,
+              city: geocoded.city,
+              address: geocoded.address,
+              country: geocoded.state || geocoded.country,
+              postalCode: geocoded.postalCode || null,
+              formattedAddress: geocoded.formattedAddress,
+            }),
+          );
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.panTo({ lat: geocoded.lat, lng: geocoded.lng });
+            updateMarkerPosition(geocoded.lat, geocoded.lng);
+          }
+          toast.success(`Location set: ${geocoded.city}`);
+          setSearchQuery('');
+          setGooglePredictions([]);
+          setNominatimResults([]);
+          setIsSearching(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Google geocoder search error:', err);
+      }
+    }
+
+    // 3. OpenStreetMap Nominatim Fallback Search
     const searchUrl = isPincode
       ? `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(
           trimmed,
@@ -195,13 +531,9 @@ export const LocationModal: React.FC<LocationModalProps> = ({
         )}&countrycodes=in&format=json&addressdetails=1&limit=5`;
 
     try {
-      const response = await fetch(searchUrl, {
-        headers: { Accept: 'application/json' },
-      });
-
+      const response = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
       let data: NominatimResult[] = response.ok ? await response.json() : [];
 
-      // Fallback to worldwide search if no results found in India
       if (data.length === 0 && !isPincode) {
         const globalRes = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
@@ -209,14 +541,16 @@ export const LocationModal: React.FC<LocationModalProps> = ({
           )}&format=json&addressdetails=1&limit=5`,
           { headers: { Accept: 'application/json' } },
         );
-        if (globalRes.ok) {
-          data = await globalRes.json();
-        }
+        if (globalRes.ok) data = await globalRes.json();
       }
 
-      setSearchResults(data);
-      if (data.length === 0) {
-        toast.info('No matching places found. Try a different city, neighborhood, or 6-digit pincode.');
+      if (data.length > 0) {
+        handleSelectNominatimResult(data[0]);
+        if (data.length > 1) {
+          setNominatimResults(data);
+        }
+      } else {
+        toast.info('No matching places found. Try a different city or 6-digit pincode.');
       }
     } catch {
       toast.error('Search request failed. Please check your internet connection.');
@@ -225,7 +559,126 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     }
   };
 
-  const handleSelectSearchResult = (result: NominatimResult) => {
+  // Select place from Google Predictions with multi-level fallback
+  const handleSelectGooglePrediction = async (prediction: GooglePrediction) => {
+    // 1. Try Google PlacesService Details
+    if (googleMapsLoaded && typeof google !== 'undefined') {
+      try {
+        const place = await new Promise<google.maps.places.PlaceResult | null>((resolve) => {
+          const container = mapContainerRef.current || document.createElement('div');
+          const placesService = new google.maps.places.PlacesService(mapInstanceRef.current || container);
+          placesService.getDetails(
+            {
+              placeId: prediction.placeId,
+              fields: ['geometry', 'formatted_address', 'address_components', 'name'],
+            },
+            (result, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && result?.geometry?.location) {
+                resolve(result);
+              } else {
+                resolve(null);
+              }
+            },
+          );
+        });
+
+        if (place && place.geometry?.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const geocoded = parseAddressComponents(place, lat, lng);
+          dispatch(
+            setManualLocation({
+              latitude: geocoded.lat,
+              longitude: geocoded.lng,
+              city: geocoded.city,
+              address: geocoded.address,
+              country: geocoded.state || geocoded.country,
+              postalCode: geocoded.postalCode || null,
+              formattedAddress: geocoded.formattedAddress,
+            }),
+          );
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.panTo({ lat, lng });
+            updateMarkerPosition(lat, lng);
+          }
+          toast.success(`Selected: ${geocoded.city}`);
+          setSearchQuery('');
+          setGooglePredictions([]);
+          setNominatimResults([]);
+          return;
+        }
+
+        // 2. Try Geocoder by placeId or description
+        const geocoderResult = await new Promise<google.maps.GeocoderResult | null>((resolve) => {
+          const geocoder = new google.maps.Geocoder();
+          geocoder.geocode({ placeId: prediction.placeId }, (results, gStatus) => {
+            if (gStatus === google.maps.GeocoderStatus.OK && results && results[0]) {
+              resolve(results[0]);
+            } else {
+              geocoder.geocode({ address: prediction.description }, (textResults, tStatus) => {
+                if (tStatus === google.maps.GeocoderStatus.OK && textResults && textResults[0]) {
+                  resolve(textResults[0]);
+                } else {
+                  resolve(null);
+                }
+              });
+            }
+          });
+        });
+
+        if (geocoderResult && geocoderResult.geometry?.location) {
+          const lat = geocoderResult.geometry.location.lat();
+          const lng = geocoderResult.geometry.location.lng();
+          const geocoded = parseAddressComponents(geocoderResult, lat, lng);
+          dispatch(
+            setManualLocation({
+              latitude: geocoded.lat,
+              longitude: geocoded.lng,
+              city: geocoded.city,
+              address: geocoded.address,
+              country: geocoded.state || geocoded.country,
+              postalCode: geocoded.postalCode || null,
+              formattedAddress: geocoded.formattedAddress,
+            }),
+          );
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.panTo({ lat, lng });
+            updateMarkerPosition(lat, lng);
+          }
+          toast.success(`Selected: ${geocoded.city}`);
+          setSearchQuery('');
+          setGooglePredictions([]);
+          setNominatimResults([]);
+          return;
+        }
+      } catch (err) {
+        console.warn('Google place select error:', err);
+      }
+    }
+
+    // 3. Fallback to Nominatim search with place description
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          prediction.description,
+        )}&countrycodes=in&format=json&addressdetails=1&limit=1`,
+        { headers: { Accept: 'application/json' } },
+      );
+      if (res.ok) {
+        const data: NominatimResult[] = await res.json();
+        if (data && data.length > 0) {
+          handleSelectNominatimResult(data[0]);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Nominatim fallback select error:', err);
+    }
+
+    toast.error('Unable to resolve place location. Please click on the map.');
+  };
+
+  const handleSelectNominatimResult = (result: NominatimResult) => {
     const lat = parseFloat(result.lat);
     const lon = parseFloat(result.lon);
     const city =
@@ -239,6 +692,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
 
     const road =
       result.address?.road ||
+      result.address?.neighbourhood ||
       result.display_name.split(',').slice(0, 2).join(', ') ||
       city;
 
@@ -254,8 +708,14 @@ export const LocationModal: React.FC<LocationModalProps> = ({
       }),
     );
 
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.panTo({ lat, lng: lon });
+      updateMarkerPosition(lat, lon);
+    }
+
     toast.success(`Location set to ${city}!`);
-    setSearchResults([]);
+    setNominatimResults([]);
+    setGooglePredictions([]);
     setSearchQuery('');
   };
 
@@ -280,443 +740,361 @@ export const LocationModal: React.FC<LocationModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-xl max-h-[90vh] rounded-3xl border shadow-2xl overflow-hidden transition-all flex flex-col animate-in zoom-in-95 duration-200 ${
+        className={`relative w-full max-w-lg md:max-w-4xl lg:max-w-5xl md:h-[620px] max-h-[92vh] rounded-3xl border shadow-2xl overflow-hidden transition-all flex flex-col animate-in zoom-in-95 duration-200 ${
           theme === 'dark'
             ? 'bg-zinc-900/95 border-zinc-800 text-zinc-100 shadow-black/80'
             : 'bg-white/95 border-zinc-200 text-zinc-900 shadow-xl'
         }`}
       >
         {/* Top Gradient Stripe */}
-        <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 shrink-0" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 shrink-0" />
 
         {/* Modal Header */}
-        <div className="p-6 pb-4 flex items-start justify-between border-b border-zinc-500/10 shrink-0">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/25 shrink-0">
-              <Compass className="w-6 h-6 animate-[spin_12s_linear_infinite]" />
+        <div className="px-5 sm:px-6 py-3.5 flex items-center justify-between border-b border-zinc-500/10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 shrink-0">
+              <Compass className="w-5 h-5 animate-[spin_16s_linear_infinite]" />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold tracking-tight">
-                Delivery Location
-              </h2>
-              <p className="text-xs opacity-60">
-                GPS auto-detection & neighborhood search
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
+                  Choose Location
+                </h2>
+                {googleMapsLoaded ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    Google Maps
+                  </span>
+                ) : isGoogleLoading ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-500">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Loading Maps...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700">
+                    GPS / OSM
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] sm:text-xs opacity-60">
+                Interactive pin picker & Google Places search
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-500/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-500/10 transition-colors cursor-pointer"
             title="Close popup"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="p-6 space-y-5 overflow-y-auto flex-1">
-          {/* SEARCH BAR (Always Available for Quick Precision) */}
-          <div className="space-y-2">
-            <form onSubmit={handleSearch} className="flex items-center gap-2">
-              <div
-                className={`flex-1 flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border transition-all ${
-                  theme === 'dark'
-                    ? 'bg-zinc-800/80 border-zinc-700/80 focus-within:border-orange-500/70'
-                    : 'bg-zinc-50 border-zinc-300 focus-within:border-orange-500'
-                }`}
-              >
-                <Search className="w-4 h-4 text-zinc-400 shrink-0" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search city or pincode (e.g. Thrissur, 680001)..."
-                  className="w-full bg-transparent text-xs sm:text-sm outline-none text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 font-medium"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSearchResults([]);
-                    }}
-                    className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+        {/* Modal Body: Desktop (Side-by-Side: Map on Left, Search & Details on Right), Mobile (Stacked: Search -> Map -> Details -> Actions) */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 overflow-y-auto md:overflow-hidden">
+          {/* MAP CANVAS (Takes 7 cols on md, 8 cols on lg. On mobile, rendered right under search) */}
+          <div className="md:col-span-7 lg:col-span-8 p-3.5 sm:p-5 flex flex-col min-h-0 order-2 md:order-1">
+            <div className="relative w-full h-52 sm:h-64 md:h-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-inner bg-zinc-100 dark:bg-zinc-800 shrink-0 md:shrink">
+              {/* Google Map Container Canvas */}
+              <div ref={mapContainerRef} className="w-full h-full" />
 
-              <button
-                type="submit"
-                disabled={isSearching || !searchQuery.trim()}
-                className="px-4 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-md shadow-orange-500/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
-              >
-                {isSearching ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <span>Search</span>
-                )}
-              </button>
-            </form>
-
-            {/* Search Results Dropdown List */}
-            {searchResults.length > 0 && (
-              <div
-                className={`p-2 rounded-2xl border shadow-lg space-y-1 ${
-                  theme === 'dark'
-                    ? 'bg-zinc-800 border-zinc-700'
-                    : 'bg-white border-zinc-200'
-                }`}
-              >
-                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Matching Locations
-                </div>
-                {searchResults.map((res) => (
-                  <button
-                    key={res.place_id}
-                    type="button"
-                    onClick={() => handleSelectSearchResult(res)}
-                    className={`w-full p-2.5 rounded-xl text-left text-xs transition-colors flex items-start gap-2.5 cursor-pointer ${
-                      theme === 'dark'
-                        ? 'hover:bg-zinc-700/60 text-zinc-200'
-                        : 'hover:bg-orange-50 text-zinc-900'
-                    }`}
-                  >
-                    <MapPin className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2 leading-relaxed">
-                      {res.display_name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Quick Regional City Chips */}
-            <div className="flex items-center gap-1.5 flex-wrap pt-1">
-              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 pr-1">
-                Popular:
-              </span>
-              {REGIONAL_PRESETS.map((city) => (
-                <button
-                  key={city.name}
-                  type="button"
-                  onClick={() => handleSelectPreset(city)}
-                  className={`px-3 py-1 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1 cursor-pointer ${
-                    locationState.city === city.city
-                      ? 'bg-orange-500/15 border-orange-500/60 text-orange-600 dark:text-orange-400 font-bold'
-                      : theme === 'dark'
-                      ? 'border-zinc-800 bg-zinc-800/40 hover:bg-zinc-700/60 text-zinc-300'
-                      : 'border-zinc-200 bg-zinc-100 hover:bg-zinc-200 text-zinc-800'
-                  }`}
-                >
-                  <MapPin className="w-3 h-3 text-orange-500" />
-                  <span>{city.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 1. LOADING STATE */}
-          {isLoading && (
-            <div className="py-10 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="relative">
-                <div className="w-14 h-14 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 animate-pulse">
-                  <Navigation className="w-7 h-7 animate-spin" />
-                </div>
-                <div className="absolute inset-0 rounded-full border-2 border-orange-500/40 animate-ping" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm">Querying Real-Time GPS</h3>
-                <p className="text-xs opacity-60 max-w-xs mx-auto mt-1">
-                  Connecting to browser geolocation and reverse-geocoding coordinates...
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* 2. PERMISSION DENIED - INDUSTRIAL UNBLOCK GUIDE */}
-          {isDenied && !isLoading && (
-            <div className="space-y-4 animate-in fade-in duration-300">
-              <div
-                className={`p-4 rounded-2xl border flex items-start gap-3.5 ${
-                  theme === 'dark'
-                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                    : 'bg-rose-50 border-rose-200 text-rose-700'
-                }`}
-              >
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                <div className="space-y-1 text-xs">
-                  <h4 className="font-bold text-sm">
-                    Location Permission Blocked in Browser
-                  </h4>
-                  <p className="opacity-90 leading-relaxed">
-                    When you click "Block" in Brave, Chrome, or Firefox, the browser permanently locks permission for this domain. Web apps cannot re-open the prompt automatically without you unblocking it.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step-by-Step Visual Instruction Box */}
-              <div
-                className={`p-4 rounded-2xl border space-y-3 ${
-                  theme === 'dark'
-                    ? 'bg-zinc-800/40 border-zinc-700/60'
-                    : 'bg-zinc-50 border-zinc-200'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-orange-500" />
-                  <span className="text-xs font-bold uppercase tracking-wider">
-                    How to Unblock in 3 Steps:
-                  </span>
-                </div>
-
-                <div className="space-y-3 text-xs opacity-90 pl-1">
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-500 font-bold flex items-center justify-center shrink-0 text-[11px]">
-                      1
-                    </span>
-                    <div>
-                      Look at your browser's address bar at the top:
-                      <div className="mt-1.5 p-2 rounded-xl bg-black/40 border border-zinc-700/60 font-mono text-[11px] text-zinc-300 flex items-center gap-2 max-w-fit">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-500/20 text-orange-400 font-sans font-bold text-[11px]">
-                          <Info className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                          <span>Permissions Icon</span>
-                        </span>
-                        <span className="font-mono text-zinc-300 font-medium">{siteHost}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-500 font-bold flex items-center justify-center shrink-0 text-[11px]">
-                      2
-                    </span>
-                    <p>
-                      Click the icon and toggle <strong className="text-orange-500">Location</strong> to <strong className="text-emerald-500">"Allow"</strong> (or click "Reset permissions").
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-500 font-bold flex items-center justify-center shrink-0 text-[11px]">
-                      3
-                    </span>
-                    <p>
-                      Click the button below to reload and activate live GPS:
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleReloadPage}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Reload Page & Enable GPS</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleRetryGPS}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
-                      theme === 'dark'
-                        ? 'border-zinc-700 hover:bg-zinc-700 text-zinc-200'
-                        : 'border-zinc-300 hover:bg-zinc-200 text-zinc-800'
-                    }`}
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-orange-500" />
-                    <span>Retry GPS Now</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 3. EXPLANATION: WHY DESKTOP SHOWS KOCHI INSTEAD OF THRISSUR */}
-          {showIspExplanation && (
-            <div
-              className={`p-3.5 rounded-2xl border text-xs flex items-start justify-between gap-3 ${
-                theme === 'dark'
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                  : 'bg-amber-50 border-amber-200 text-amber-800'
-              }`}
-            >
-              <div className="flex items-start gap-2.5">
-                <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
-                <div className="space-y-1">
-                  <span className="font-bold block">
-                    Why does browser GPS point to Kochi when you are in Thrissur?
-                  </span>
-                  <p className="opacity-90 leading-relaxed text-[11px]">
-                    Laptops and desktop PCs lack hardware satellite GPS chips. Browsers approximate location using your ISP's public IP address. In Kerala, major fiber networks (Jio, Airtel, Asianet, Kerala Vision) route all internet traffic through the central Kochi Internet Gateway (IXP). Use the search bar above or click <strong>Thrissur</strong> to set your exact town!
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowIspExplanation(false)}
-                className="opacity-50 hover:opacity-100 p-1 text-xs"
-                title="Dismiss note"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* 4. CURRENT ACTIVE / DETECTED LOCATION CARD */}
-          {hasCoordinates && !isLoading && (
-            <div className="space-y-3 pt-1 animate-in fade-in duration-300">
-              <div
-                className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
-                  theme === 'dark'
-                    ? 'bg-gradient-to-r from-zinc-800/80 via-zinc-800/40 to-orange-950/20 border-zinc-700/60'
-                    : 'bg-gradient-to-r from-orange-50/70 via-amber-50/50 to-white border-orange-200/80'
-                }`}
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="relative flex items-center justify-center">
-                    <div className="w-11 h-11 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30">
-                      <MapPin className="w-5 h-5" />
-                    </div>
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full animate-ping" />
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full" />
-                  </div>
-
-                  <div>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
-                      <ShieldCheck className="w-3 h-3" />
-                      Active Selection
-                    </span>
-                    <h3 className="text-base font-black tracking-tight leading-snug">
-                      {locationState.city || 'Custom Location'}
-                    </h3>
-                  </div>
-                </div>
-
+              {/* Floating Map Overlay: Center on GPS */}
+              <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
                 <button
                   type="button"
                   onClick={handleRetryGPS}
-                  title="Re-query GPS"
-                  className={`p-2 rounded-xl border text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                    theme === 'dark'
-                      ? 'border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300'
-                      : 'border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-700'
-                  }`}
+                  title="Locate my position via browser GPS"
+                  className="p-2 sm:p-2.5 rounded-xl bg-white/95 dark:bg-zinc-900/95 text-zinc-800 dark:text-white shadow-lg backdrop-blur-md hover:bg-white dark:hover:bg-zinc-900 active:scale-95 transition-all border border-zinc-200 dark:border-zinc-700 cursor-pointer flex items-center gap-1.5 text-xs font-bold"
                 >
-                  <RotateCw className="w-3.5 h-3.5 text-orange-500" />
-                  <span className="text-[11px] font-medium hidden sm:inline">
-                    GPS
-                  </span>
+                  <Navigation className="w-4 h-4 text-orange-500" />
+                  <span className="hidden sm:inline">My GPS</span>
                 </button>
               </div>
 
-              {/* Formatted Address Box */}
-              <div
-                className={`p-3.5 rounded-2xl border space-y-1.5 ${
-                  theme === 'dark'
-                    ? 'bg-zinc-800/40 border-zinc-800'
-                    : 'bg-zinc-50 border-zinc-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
-                    Full Delivery Address
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={handleCopyAddress}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-500 hover:underline cursor-pointer"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-3 h-3 text-emerald-500" />
-                        <span className="text-emerald-500">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
+              {/* Floating Bottom Hint Banner */}
+              <div className="absolute bottom-2 left-2 right-2 pointer-events-none z-10">
+                <div className="px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md text-white text-[11px] font-medium text-center shadow-md border border-white/10">
+                  📍 Drag the pin or click anywhere on the map to set location
                 </div>
-
-                <p className="text-xs font-semibold leading-relaxed text-zinc-800 dark:text-zinc-200">
-                  {locationState.formattedAddress ||
-                    locationState.address ||
-                    'Precise location active'}
-                </p>
-              </div>
-
-              {/* Coordinates & Google Maps Link */}
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="font-mono text-[11px] opacity-60">
-                  {locationState.coords?.latitude.toFixed(4)}° N,{' '}
-                  {locationState.coords?.longitude.toFixed(4)}° E
-                </span>
-
-                {locationState.coords && (
-                  <a
-                    href={`https://www.google.com/maps?q=${locationState.coords.latitude},${locationState.coords.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-500 hover:underline"
-                  >
-                    <span>View Map</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
               </div>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Modal Footer Controls */}
-        <div className="p-6 pt-4 border-t border-zinc-500/10 flex items-center justify-end gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className={`px-5 py-2.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-              theme === 'dark'
-                ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
-                : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100'
-            }`}
-          >
-            Cancel
-          </button>
+          {/* CONTROLS & DETAILS PANEL (Takes 5 cols on md, 4 cols on lg) */}
+          <div className="md:col-span-5 lg:col-span-4 p-3.5 sm:p-5 flex flex-col justify-between border-t md:border-t-0 md:border-l border-zinc-500/10 bg-zinc-50/50 dark:bg-zinc-900/40 min-h-0 order-1 md:order-2 space-y-3.5">
+            {/* Search Input & Active Address Section */}
+            <div className="space-y-3">
+              <div className="relative">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+                  Search Location
+                </label>
+                <form onSubmit={handleSearchSubmit} className="flex items-center gap-1.5">
+                  <div
+                    className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                      theme === 'dark'
+                        ? 'bg-zinc-800/90 border-zinc-700 focus-within:border-orange-500'
+                        : 'bg-white border-zinc-300 focus-within:border-orange-500'
+                    }`}
+                  >
+                    <Search className="w-4 h-4 text-zinc-400 shrink-0" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => handleQueryChange(e.target.value)}
+                      placeholder={
+                        googleMapsLoaded
+                          ? 'Search city, landmark, or street...'
+                          : 'Search city or pincode...'
+                      }
+                      className="w-full bg-transparent text-xs outline-none text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 font-medium"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setGooglePredictions([]);
+                          setNominatimResults([]);
+                        }}
+                        className="p-0.5 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
 
-          {hasCoordinates && (
-            <button
-              id="confirm-location-btn"
-              type="button"
-              onClick={handleConfirm}
-              className="px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Check className="w-4 h-4" />
-              <span>{confirmButtonText}</span>
-            </button>
-          )}
+                  <button
+                    type="submit"
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-md shadow-orange-500/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Find</span>}
+                  </button>
+                </form>
 
-          {!hasCoordinates && (isDenied || isFailed) && (
-            <button
-              type="button"
-              onClick={handleReloadPage}
-              className="px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Reload Page</span>
-            </button>
-          )}
+                {/* Google Places Predictions Dropdown */}
+                {googlePredictions.length > 0 && (
+                  <div
+                    className={`absolute z-30 left-0 right-0 mt-1.5 p-1.5 rounded-2xl border shadow-2xl max-h-52 overflow-y-auto space-y-1 ${
+                      theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-200'
+                    }`}
+                  >
+                    <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      <span>Places Suggestions</span>
+                      <span className="text-orange-500 font-semibold">Google Places</span>
+                    </div>
+                    {googlePredictions.map((pred) => (
+                      <button
+                        key={pred.placeId}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSelectGooglePrediction(pred)}
+                        className={`w-full p-2 rounded-xl text-left text-xs transition-colors flex items-start gap-2 cursor-pointer ${
+                          theme === 'dark'
+                            ? 'hover:bg-zinc-700/60 text-zinc-200'
+                            : 'hover:bg-orange-50 text-zinc-900'
+                        }`}
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold block truncate">
+                            {pred.mainText || pred.description}
+                          </span>
+                          {pred.secondaryText && (
+                            <span className="text-[10px] opacity-60 block truncate">
+                              {pred.secondaryText}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Nominatim Fallback Dropdown List */}
+                {nominatimResults.length > 0 && (
+                  <div
+                    className={`absolute z-30 left-0 right-0 mt-1.5 p-1.5 rounded-2xl border shadow-2xl max-h-52 overflow-y-auto space-y-1 ${
+                      theme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-200'
+                    }`}
+                  >
+                    <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      Matching Locations (OSM)
+                    </div>
+                    {nominatimResults.map((res) => (
+                      <button
+                        key={res.place_id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSelectNominatimResult(res)}
+                        className={`w-full p-2 rounded-xl text-left text-xs transition-colors flex items-start gap-2 cursor-pointer ${
+                          theme === 'dark'
+                            ? 'hover:bg-zinc-700/60 text-zinc-200'
+                            : 'hover:bg-orange-50 text-zinc-900'
+                        }`}
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
+                        <span className="line-clamp-2 leading-tight">{res.display_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Active Location Details Card */}
+              {hasCoordinates && !isLoading && (
+                <div
+                  className={`p-3.5 rounded-2xl border space-y-2 transition-all ${
+                    theme === 'dark'
+                      ? 'bg-zinc-800/60 border-zinc-700/60'
+                      : 'bg-white border-zinc-200 shadow-xs'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
+                      <ShieldCheck className="w-3 h-3" />
+                      Active Pin
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyAddress}
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-500 hover:underline cursor-pointer"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-500" />
+                          <span className="text-emerald-500">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-extrabold tracking-tight truncate">
+                        {locationState.city || 'Custom Location'}
+                      </h4>
+                      <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300 line-clamp-2 mt-0.5">
+                        {locationState.formattedAddress ||
+                          locationState.address ||
+                          'Address detected'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Coordinates & Google Maps Link */}
+                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-zinc-500/10">
+                    <span className="font-mono opacity-60">
+                      {locationState.coords?.latitude.toFixed(4)}° N,{' '}
+                      {locationState.coords?.longitude.toFixed(4)}° E
+                    </span>
+
+                    {locationState.coords && (
+                      <a
+                        href={`https://www.google.com/maps?q=${locationState.coords.latitude},${locationState.coords.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-semibold text-orange-500 hover:underline"
+                      >
+                        <span>Google Maps</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Loading Indicator */}
+              {isLoading && (
+                <div className="py-4 flex flex-col items-center justify-center text-center space-y-1.5">
+                  <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 animate-pulse">
+                    <Navigation className="w-4 h-4 animate-spin" />
+                  </div>
+                  <span className="text-xs font-bold">Querying Real-Time GPS...</span>
+                </div>
+              )}
+
+              {/* Permission Denied Notice */}
+              {isDenied && !isLoading && (
+                <div
+                  className={`p-3 rounded-2xl border text-xs space-y-2 ${
+                    theme === 'dark'
+                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                      : 'bg-rose-50 border-rose-200 text-rose-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span className="font-bold">Location Permission Blocked</span>
+                  </div>
+                  <p className="text-[11px] opacity-90 leading-tight">
+                    Allow location permission in browser address bar or use search bar above.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleReloadPage}
+                    className="w-full py-1.5 rounded-xl text-xs font-bold bg-orange-500 text-white flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Reload Page</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions: Cancel & Confirm buttons */}
+            <div className="pt-2.5 border-t border-zinc-500/10 flex items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                  theme === 'dark'
+                    ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+                    : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100'
+                }`}
+              >
+                Cancel
+              </button>
+
+              {hasCoordinates && (
+                <button
+                  id="confirm-location-btn"
+                  type="button"
+                  onClick={handleConfirm}
+                  className="flex-[2] py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{confirmButtonText}</span>
+                </button>
+              )}
+
+              {!hasCoordinates && (isDenied || isFailed) && (
+                <button
+                  type="button"
+                  onClick={handleRetryGPS}
+                  className="flex-[2] py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>Retry GPS</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

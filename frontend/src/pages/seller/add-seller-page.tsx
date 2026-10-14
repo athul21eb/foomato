@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   useCreateSellerMutation,
   useGetMySellerQuery,
   useUploadImageMutation,
 } from '../../features/seller/api/seller.api';
+import {
+  createSellerSchema,
+  type CreateSellerFormValues,
+} from '../../features/seller/schemas/seller.schema';
 import {
   Store,
   Upload,
@@ -26,29 +32,15 @@ import { toast } from 'sonner';
 import { getErrorMessage } from '../../lib/utils';
 import { LocationModal } from '../../components/ui/location-modal';
 
-interface FormErrors {
-  file?: string;
-  name?: string;
-  description?: string;
-  phone?: string;
-  formattedAddress?: string;
-}
-
 export const AddSellerPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: existingSeller, isLoading: isCheckingSeller } =
     useGetMySellerQuery();
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [phone, setPhone] = useState('');
-  const [formattedAddress, setFormattedAddress] = useState('');
-  const [latitude, setLatitude] = useState<number>(12.9716); // Default Bangalore
-  const [longitude, setLongitude] = useState<number>(77.5946);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [fileError, setFileError] = useState<string>('');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState<boolean>(false);
-  const [errors, setErrors] = useState<FormErrors>({});
 
   const [createSeller, { isLoading: isCreating }] = useCreateSellerMutation();
   const [uploadImage, { isLoading: isUploading }] = useUploadImageMutation();
@@ -60,20 +52,43 @@ export const AddSellerPage: React.FC = () => {
     }
   }, [existingSeller, isCheckingSeller, navigate]);
 
+  // React Hook Form with Zod validation
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    control,
+    formState: { errors },
+  } = useForm<CreateSellerFormValues>({
+    resolver: zodResolver(createSellerSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      phone: '',
+      formattedAddress: '',
+      latitude: 12.9716, // Default Bangalore
+      longitude: 77.5946,
+    },
+  });
+
+  const [name, description, formattedAddress, rawLat, rawLng] = useWatch({
+    control,
+    name: ['name', 'description', 'formattedAddress', 'latitude', 'longitude'],
+  });
+  const latitude = rawLat || 12.9716;
+  const longitude = rawLng || 77.5946;
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setErrors((prev) => ({
-          ...prev,
-          file: 'Image size must be less than 5MB',
-        }));
+        setFileError('Image size must be less than 5MB');
         toast.error('Image size must be less than 5MB');
         return;
       }
       setSelectedFile(file);
       setImagePreview(URL.createObjectURL(file));
-      setErrors((prev) => ({ ...prev, file: undefined }));
+      setFileError('');
     }
   };
 
@@ -86,8 +101,8 @@ export const AddSellerPage: React.FC = () => {
     longitude: number | null;
   }) => {
     if (locationData.latitude !== null && locationData.longitude !== null) {
-      setLatitude(locationData.latitude);
-      setLongitude(locationData.longitude);
+      setValue('latitude', locationData.latitude, { shouldValidate: true });
+      setValue('longitude', locationData.longitude, { shouldValidate: true });
     }
     const fullAddress =
       locationData.address ||
@@ -95,85 +110,37 @@ export const AddSellerPage: React.FC = () => {
         .filter(Boolean)
         .join(', ');
     if (fullAddress) {
-      setFormattedAddress(fullAddress);
-      setErrors((prev) => ({ ...prev, formattedAddress: undefined }));
+      setValue('formattedAddress', fullAddress, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
     }
     toast.success('Store location selected via map!');
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-
+  const onSubmit = async (data: CreateSellerFormValues) => {
     if (!selectedFile) {
-      newErrors.file = 'Please upload a store banner or logo photo';
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      newErrors.name = 'Restaurant name is required';
-    } else if (trimmedName.length < 2) {
-      newErrors.name = 'Restaurant name must be at least 2 characters';
-    } else if (trimmedName.length > 100) {
-      newErrors.name = 'Restaurant name cannot exceed 100 characters';
-    }
-
-    const trimmedDesc = description.trim();
-    if (!trimmedDesc) {
-      newErrors.description = 'Store description & specialities are required';
-    } else if (trimmedDesc.length < 5) {
-      newErrors.description = 'Description must be at least 5 characters';
-    } else if (trimmedDesc.length > 500) {
-      newErrors.description = 'Description cannot exceed 500 characters';
-    }
-
-    const trimmedPhone = phone.trim();
-    if (!trimmedPhone) {
-      newErrors.phone = 'Contact phone number is required';
-    } else {
-      const digitsOnly = trimmedPhone.replace(/\D/g, '');
-      if (digitsOnly.length !== 10) {
-        newErrors.phone = 'Phone number must be exactly 10 digits';
-      } else if (!/^[0-9+\-\s()]+$/.test(trimmedPhone)) {
-        newErrors.phone = 'Please enter a valid 10-digit phone number';
-      }
-    }
-
-    const trimmedAddress = formattedAddress.trim();
-    if (!trimmedAddress) {
-      newErrors.formattedAddress =
-        'Store address is required (use location picker or enter address)';
-    } else if (trimmedAddress.length < 3) {
-      newErrors.formattedAddress = 'Store address must be at least 3 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      toast.error('Please fix the errors in the form before submitting');
+      setFileError('Please upload a store banner or logo photo');
+      toast.error('Please upload a store banner or logo photo');
       return;
     }
 
     try {
       // 1. Upload image to Utils service (port 5002)
       const formData = new FormData();
-      formData.append('file', selectedFile!);
+      formData.append('file', selectedFile);
       const uploadResult = await uploadImage(formData).unwrap();
 
       // 2. Create Seller profile in Seller service (port 5001)
       await createSeller({
-        name: name.trim(),
-        description: description.trim(),
-        phone: phone.trim(),
+        name: data.name.trim(),
+        description: data.description.trim(),
+        phone: data.phone.trim(),
         image: uploadResult.url,
         autoLocation: {
           type: 'Point',
-          coordinates: [longitude, latitude],
-          formattedAddress: formattedAddress.trim(),
+          coordinates: [data.longitude, data.latitude],
+          formattedAddress: data.formattedAddress.trim(),
         },
         isOpen: true,
       }).unwrap();
@@ -216,7 +183,7 @@ export const AddSellerPage: React.FC = () => {
       </div>
 
       {/* Main Responsive Form Layout: Full horizontal allocation on md+ */}
-      <form noValidate onSubmit={handleSubmit} className="w-full">
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* LEFT COLUMN (md:col-span-5 lg:col-span-5): Image upload & Real-time Live Preview */}
           <div className="md:col-span-5 lg:col-span-5 flex flex-col gap-6">
@@ -231,7 +198,7 @@ export const AddSellerPage: React.FC = () => {
 
               <div
                 className={`relative h-56 sm:h-64 rounded-2xl border-2 border-dashed overflow-hidden group transition-all ${
-                  errors.file
+                  fileError
                     ? 'border-red-500 dark:border-red-500 bg-red-500/5'
                     : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30'
                 }`}
@@ -260,7 +227,7 @@ export const AddSellerPage: React.FC = () => {
                   <label className="h-full flex flex-col items-center justify-center text-center p-6 cursor-pointer hover:bg-orange-500/5 transition-colors">
                     <div
                       className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-md ${
-                        errors.file
+                        fileError
                           ? 'bg-red-500/10 text-red-500 shadow-red-500/10'
                           : 'bg-orange-500/10 text-orange-500 shadow-orange-500/10'
                       }`}
@@ -285,10 +252,10 @@ export const AddSellerPage: React.FC = () => {
               </div>
 
               {/* Validation Error Message for File */}
-              {errors.file && (
+              {fileError && (
                 <p className="text-xs text-red-500 font-medium flex items-center gap-1.5 mt-2 animate-in fade-in">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{errors.file}</span>
+                  <span>{fileError}</span>
                 </p>
               )}
             </div>
@@ -330,15 +297,15 @@ export const AddSellerPage: React.FC = () => {
 
                 <div className="p-3.5 space-y-1.5">
                   <h4 className="font-extrabold text-sm text-zinc-900 dark:text-white line-clamp-1">
-                    {name.trim() || 'Your Restaurant Name'}
+                    {name?.trim() || 'Your Restaurant Name'}
                   </h4>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
-                    {description.trim() || 'Your menu highlights and specialities will appear here for diners.'}
+                    {description?.trim() || 'Your menu highlights and specialities will appear here for diners.'}
                   </p>
                   <div className="pt-2 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400 border-t border-zinc-200/50 dark:border-zinc-800/80">
                     <span className="flex items-center gap-1 line-clamp-1">
                       <MapPin className="w-3 h-3 text-orange-500 shrink-0" />
-                      {formattedAddress.trim() || 'Store Location'}
+                      {formattedAddress?.trim() || 'Store Location'}
                     </span>
                     <span className="flex items-center gap-1 shrink-0 font-medium text-emerald-500">
                       <Clock className="w-3 h-3" />
@@ -371,26 +338,20 @@ export const AddSellerPage: React.FC = () => {
                   <Store className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      if (errors.name) {
-                        setErrors((prev) => ({ ...prev, name: undefined }));
-                      }
-                    }}
+                    {...register('name')}
                     placeholder="e.g. Biryani Blues & Kebabs"
                     disabled={isSubmitting}
                     className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm focus:outline-hidden focus:ring-2 transition-all font-medium ${
                       errors.name
                         ? 'border-red-500 bg-red-500/5 focus:ring-red-500/40 text-red-900 dark:text-red-100'
-                        : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 focus:ring-orange-500/40'
+                        : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 focus:ring-orange-500/40 text-zinc-900 dark:text-white'
                     }`}
                   />
                 </div>
                 {errors.name && (
                   <p className="text-xs text-red-500 font-medium flex items-center gap-1.5 mt-1.5 animate-in fade-in">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{errors.name}</span>
+                    <span>{errors.name.message}</span>
                   </p>
                 )}
               </div>
@@ -402,36 +363,27 @@ export const AddSellerPage: React.FC = () => {
                     Description & Specialities <span className="text-red-500">*</span>
                   </label>
                   <span className="text-[11px] text-zinc-400 font-mono">
-                    {description.length}/500
+                    {(description || '').length}/500
                   </span>
                 </div>
                 <div className="relative">
                   <FileText className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3.5" />
                   <textarea
-                    value={description}
-                    onChange={(e) => {
-                      setDescription(e.target.value);
-                      if (errors.description) {
-                        setErrors((prev) => ({
-                          ...prev,
-                          description: undefined,
-                        }));
-                      }
-                    }}
+                    {...register('description')}
                     rows={3}
                     placeholder="Fresh wood-fired sourdough pizzas, artisanal pasta, and homemade desserts..."
                     disabled={isSubmitting}
                     className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm focus:outline-hidden focus:ring-2 transition-all resize-none font-medium ${
                       errors.description
                         ? 'border-red-500 bg-red-500/5 focus:ring-red-500/40 text-red-900 dark:text-red-100'
-                        : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 focus:ring-orange-500/40'
+                        : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 focus:ring-orange-500/40 text-zinc-900 dark:text-white'
                     }`}
                   />
                 </div>
                 {errors.description && (
                   <p className="text-xs text-red-500 font-medium flex items-center gap-1.5 mt-1.5 animate-in fade-in">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{errors.description}</span>
+                    <span>{errors.description.message}</span>
                   </p>
                 )}
               </div>
@@ -445,27 +397,21 @@ export const AddSellerPage: React.FC = () => {
                   <Phone className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      if (errors.phone) {
-                        setErrors((prev) => ({ ...prev, phone: undefined }));
-                      }
-                    }}
+                    {...register('phone')}
                     placeholder="9876543210"
                     maxLength={10}
                     disabled={isSubmitting}
                     className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm focus:outline-hidden focus:ring-2 transition-all font-medium ${
                       errors.phone
                         ? 'border-red-500 bg-red-500/5 focus:ring-red-500/40 text-red-900 dark:text-red-100'
-                        : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 focus:ring-orange-500/40'
+                        : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 focus:ring-orange-500/40 text-zinc-900 dark:text-white'
                     }`}
                   />
                 </div>
                 {errors.phone && (
                   <p className="text-xs text-red-500 font-medium flex items-center gap-1.5 mt-1.5 animate-in fade-in">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{errors.phone}</span>
+                    <span>{errors.phone.message}</span>
                   </p>
                 )}
               </div>
@@ -478,25 +424,25 @@ export const AddSellerPage: React.FC = () => {
                     : 'border-orange-500/30 bg-orange-500/5 dark:bg-orange-500/10'
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4" />
-                      Store Location & GPS Coordinates <span className="text-red-500">*</span>
-                    </label>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      Pinpoint your store using browser GPS or city search.
+                    <h4 className="text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-orange-500" />
+                      Select Restaurant Location on Interactive Map <span className="text-red-500">*</span>
+                    </h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Pinpoint your exact restaurant location so customers and delivery riders can locate you.
                     </p>
                   </div>
 
-                  {/* Button to open LocationModal */}
                   <button
                     type="button"
                     onClick={() => setIsLocationModalOpen(true)}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-md shadow-orange-500/20 hover:brightness-110 active:scale-95 transition-all cursor-pointer shrink-0"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 hover:bg-orange-600 transition-all cursor-pointer shrink-0"
                   >
                     <Compass className="w-4 h-4" />
-                    <span>Choose Location on Map</span>
+                    <span>Choose on Map</span>
                   </button>
                 </div>
 
@@ -504,28 +450,19 @@ export const AddSellerPage: React.FC = () => {
                 <div>
                   <input
                     type="text"
-                    value={formattedAddress}
-                    onChange={(e) => {
-                      setFormattedAddress(e.target.value);
-                      if (errors.formattedAddress) {
-                        setErrors((prev) => ({
-                          ...prev,
-                          formattedAddress: undefined,
-                        }));
-                      }
-                    }}
-                    placeholder="Click 'Choose Location on Map' or type your street address..."
+                    {...register('formattedAddress')}
+                    placeholder="Click 'Choose on Map' or type your street address..."
                     disabled={isSubmitting}
                     className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-hidden focus:ring-2 transition-all font-medium ${
                       errors.formattedAddress
                         ? 'border-red-500 bg-red-500/5 focus:ring-red-500/40 text-red-900 dark:text-red-100'
-                        : 'border-zinc-200 dark:border-zinc-700 bg-white/90 dark:bg-zinc-900/90 focus:ring-orange-500/40'
+                        : 'border-zinc-200 dark:border-zinc-700 bg-white/90 dark:bg-zinc-900/90 focus:ring-orange-500/40 text-zinc-900 dark:text-white'
                     }`}
                   />
                   {errors.formattedAddress && (
                     <p className="text-xs text-red-500 font-medium flex items-center gap-1.5 mt-1.5 animate-in fade-in">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{errors.formattedAddress}</span>
+                      <span>{errors.formattedAddress.message}</span>
                     </p>
                   )}
                 </div>

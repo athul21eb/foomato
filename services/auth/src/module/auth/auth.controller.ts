@@ -61,6 +61,7 @@ export class AuthController {
   ) {
     const result = await this.authService.googleLogin(googleLoginDto);
     this.setRefreshTokenCookie(res, result.refreshToken);
+    console.log(result.accessToken, '=========access=========');
     return {
       user: result.user,
       accessToken: result.accessToken,

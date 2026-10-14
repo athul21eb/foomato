@@ -43,4 +43,5 @@
 
 
 #### Location & Maps
-- [ ] Location chosen from Google Maps API
+- [x] Location chosen from Google Maps API (Google Places Autocomplete + Interactive Draggable Map pin in LocationModal)
+- [x] Location change modal integration in Seller Profile Edit mode

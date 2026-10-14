@@ -7,6 +7,7 @@ export const updateSellerSchema = z.object({
     .min(2, 'Store name must be at least 2 characters')
     .max(100, 'Store name cannot exceed 100 characters'),
   phone: z
+    .coerce
     .string()
     .trim()
     .min(10, 'Phone number must be at least 10 digits')
@@ -15,6 +16,7 @@ export const updateSellerSchema = z.object({
   description: z
     .string()
     .trim()
+    .min(10, 'Description must be at least 10 characters')
     .max(500, 'Description cannot exceed 500 characters'),
   formattedAddress: z
     .string()
@@ -36,3 +38,23 @@ export const createSellerSchema = updateSellerSchema.extend({
 });
 
 export type CreateSellerFormValues = z.infer<typeof createSellerSchema>;
+
+export const menuItemSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Dish name must be at least 2 characters')
+    .max(80, 'Dish name cannot exceed 80 characters'),
+  price: z
+    .coerce
+    .number({ message: 'Price is required' })
+    .positive('Price must be greater than 0'),
+  description: z
+    .string()
+    .trim()
+    .min(5, 'Description must be at least 5 characters')
+    .max(300, 'Description cannot exceed 300 characters'),
+  isVeg: z.boolean(),
+});
+
+export type MenuItemFormValues = z.infer<typeof menuItemSchema>;
