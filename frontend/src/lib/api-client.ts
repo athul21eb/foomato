@@ -1,7 +1,8 @@
 import type { ApiResponse } from '../types/api';
 import { store } from '../app/store';
+import { ENV } from '../config/env';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = ENV.API_URL;
 
 interface RequestOptions extends RequestInit {
   data?: unknown;

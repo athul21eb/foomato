@@ -7,6 +7,12 @@ export interface ISellerRepository {
   findById(id: string): Promise<SellerEntity | null>;
   findByOwnerId(ownerId: string): Promise<SellerEntity | null>;
   findAll(): Promise<SellerEntity[]>;
+  findNearby(params: {
+    latitude: number;
+    longitude: number;
+    radius?: number;
+    search?: string;
+  }): Promise<SellerEntity[]>;
   update(
     id: string,
     seller: Partial<SellerEntity>,

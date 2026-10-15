@@ -18,9 +18,13 @@ export class CloudinaryService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
-    const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
-    const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
+    const cloudName = this.configService.getOrThrow<string>(
+      'CLOUDINARY_CLOUD_NAME',
+    );
+    const apiKey = this.configService.getOrThrow<string>('CLOUDINARY_API_KEY');
+    const apiSecret = this.configService.getOrThrow<string>(
+      'CLOUDINARY_API_SECRET',
+    );
 
     cloudinary.config({
       cloud_name: cloudName,

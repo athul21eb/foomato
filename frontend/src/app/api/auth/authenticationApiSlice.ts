@@ -13,8 +13,9 @@ import {
 } from '../../../slices/auth/authSlice';
 import type { ApiResponse } from '../../../types/api';
 import type { AuthResponse } from '../../../features/auth/types/auth.types';
+import { ENV } from '../../../config/env';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = ENV.API_URL;
 
 const baseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,

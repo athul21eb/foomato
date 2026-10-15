@@ -1,5 +1,5 @@
 import { NestFactory, Reflector } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
@@ -16,6 +16,13 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  app.setGlobalPrefix('api');
+
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -26,7 +33,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT', 5002);
+  const port = configService.getOrThrow<number>('PORT');
 
   await app.listen(port);
   logger.log(`Utils service running on port ${port}`);

@@ -10,6 +10,7 @@
 #### utils service
 - [x] cloudinary service setup (port 5002, Global CloudinaryModule)
 - [x] route for cloudinary upload buffer to response image url (POST /upload, POST /api/upload)
+- [x] API versioning /api/v1 (NestJS URI versioning with /api prefix on auth, seller, and utils microservices)
 
 ### Frontend
 - [x] login via google
@@ -34,14 +35,20 @@
 
 #### Seller Service — Items (Menu & Food Items Management)
 - [ ] Item Domain entity
+- [x] add getNearBy restuarant for public user with lat, lng, radius, and search queries (GET /api/v1/seller/nearby & GET /api/v1/seller/:id)
+- [] cart enitity and its crud operations in seller service
 
 ### Frontend
 
 #### Seller Portal — Menu Management
 
 - [ ] Menu items list view on Seller Dashboard
+- [ ] show the nearby seller to public users
+- [] show the seller detials page to public users with menuitem with add tocart button
+- [] cart icon and cart page with menuitems and cartManagemnt 
 
-
+- [x] fetch nearby restaurants by geo coordinates (lat, lng) with TanStack Query
+- [x] show the restaurants fetched (RestaurantCard grid) and restaurant details page (/restaurant/:id with public menu catalog)
 #### Location & Maps
 - [x] Location chosen from Google Maps API (Google Places Autocomplete + Interactive Draggable Map pin in LocationModal)
 - [x] Location change modal integration in Seller Profile Edit mode

@@ -13,6 +13,7 @@ import { SellerEntity } from './domain/seller.entity';
 import { CreateSellerDto } from './dto/create-seller.dto';
 import { UpdateSellerDto } from './dto/update-seller.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { GetNearbySellersDto } from './dto/get-nearby-sellers.dto';
 
 @Injectable()
 export class SellerService {
@@ -139,5 +140,30 @@ export class SellerService {
 
   async findAll(): Promise<SellerEntity[]> {
     return this.sellerRepository.findAll();
+  }
+
+  async getNearbyRestaurants(dto: GetNearbySellersDto): Promise<{
+    count: number;
+    restaurants: SellerEntity[];
+  }> {
+    const restaurants = await this.sellerRepository.findNearby({
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      radius: dto.radius,
+      search: dto.search,
+    });
+
+    return {
+      count: restaurants.length,
+      restaurants,
+    };
+  }
+
+  async fetchSingleRestaurant(id: string): Promise<SellerEntity> {
+    const seller = await this.sellerRepository.findById(id);
+    if (!seller) {
+      throw new NotFoundException('Restaurant not found');
+    }
+    return seller;
   }
 }

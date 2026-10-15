@@ -8,8 +8,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGO_URI'),
-        dbName: configService.get<string>('MONGO_DB_NAME', 'foomato'),
+        uri: configService.getOrThrow<string>('MONGO_URI'),
+        dbName: configService.getOrThrow<string>('MONGO_DB_NAME'),
       }),
       inject: [ConfigService],
     }),

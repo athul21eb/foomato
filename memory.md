@@ -39,7 +39,7 @@ Last updated: 2026-10-14T01:38:00+05:30
     - Full menu dish catalog with category filters, live search, veg/non-veg tags, in-stock / out-of-stock toggling, and dish deletion.
     - "Add New Menu Item" modal dialog with inputs for dish title, category, price, veg toggle, description, and dish image.
   - Created [seller-orders-tab.tsx](file:///home/athul/2026_grinding/foomato/frontend/src/features/seller/components/seller-orders-tab.tsx):
-    - Live order status workflow with filters: *All Orders*, *Incoming / Action Required*, *In Kitchen*, *Ready for Rider*, and *Fulfilled*.
+    - Live order status workflow with filters: _All Orders_, _Incoming / Action Required_, _In Kitchen_, _Ready for Rider_, and _Fulfilled_.
     - Interactive order cards with customer address, dish breakdown, itemized notes, payment badges, and one-click status transitions.
   - Fixed Google Maps integration in [location-modal.tsx](file:///home/athul/2026_grinding/foomato/frontend/src/components/ui/location-modal.tsx) using singleton script loader [google-maps-loader.ts](file:///home/athul/2026_grinding/foomato/frontend/src/lib/google-maps-loader.ts), migrating to `AdvancedMarkerElement` and fixing postal code / location search.
   - Added `scrollbar-gutter: stable;` to [index.css](file:///home/athul/2026_grinding/foomato/frontend/src/index.css) to eliminate layout shifting on modal/toggle open.
@@ -93,5 +93,3 @@ Last updated: 2026-10-14T01:38:00+05:30
 
 - Connect `SellerMenuTab` with backend seller menu item endpoints when created in `services/seller`.
 - Order management backend microservice and real-time WebSocket order events.
-
-

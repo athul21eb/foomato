@@ -222,89 +222,99 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   // Initialize interactive Google Map ONCE when modal is open and Google Maps is ready
   useEffect(() => {
     if (!isOpen || !googleMapsLoaded || !mapContainerRef.current) return;
+    if (typeof window === 'undefined' || typeof window.google?.maps?.Map !== 'function') {
+      console.warn('Google Maps Map constructor is not ready yet.');
+      return;
+    }
 
-    const currentLat = initialCenterRef.current.lat;
-    const currentLng = initialCenterRef.current.lng;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    // Reset references to ensure fresh initialization on newly mounted DOM node
-    mapInstanceRef.current = null;
-    markerInstanceRef.current = null;
+    try {
+      const currentLat = initialCenterRef.current.lat;
+      const currentLng = initialCenterRef.current.lng;
 
-    // Create new Map instance with mapId required for AdvancedMarkerElement
-    const map = new google.maps.Map(mapContainerRef.current, {
-      center: { lat: currentLat, lng: currentLng },
-      zoom: 15,
-      mapId: 'foomato_location_picker',
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      zoomControl: true,
-      gestureHandling: 'greedy',
-    });
-    mapInstanceRef.current = map;
+      // Reset references to ensure fresh initialization on newly mounted DOM node
+      mapInstanceRef.current = null;
+      markerInstanceRef.current = null;
 
-    // Modern AdvancedMarkerElement to resolve deprecation warning
-    if (google.maps.marker?.AdvancedMarkerElement) {
-      const advMarker = new google.maps.marker.AdvancedMarkerElement({
-        position: { lat: currentLat, lng: currentLng },
-        map,
-        gmpDraggable: true,
-        title: 'Drag to adjust your location',
+      // Create new Map instance with mapId required for AdvancedMarkerElement
+      const map = new google.maps.Map(mapContainerRef.current, {
+        center: { lat: currentLat, lng: currentLng },
+        zoom: 15,
+        mapId: 'foomato_location_picker',
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControl: true,
+        gestureHandling: 'greedy',
       });
-      markerInstanceRef.current = advMarker;
+      mapInstanceRef.current = map;
 
-      advMarker.addListener('dragend', () => {
-        const pos = advMarker.position;
-        if (pos) {
-          const lat = typeof pos.lat === 'function' ? pos.lat() : Number(pos.lat);
-          const lng = typeof pos.lng === 'function' ? pos.lng() : Number(pos.lng);
-          if (!isNaN(lat) && !isNaN(lng)) {
+      // Modern AdvancedMarkerElement to resolve deprecation warning
+      if (google.maps.marker?.AdvancedMarkerElement) {
+        const advMarker = new google.maps.marker.AdvancedMarkerElement({
+          position: { lat: currentLat, lng: currentLng },
+          map,
+          gmpDraggable: true,
+          title: 'Drag to adjust your location',
+        });
+        markerInstanceRef.current = advMarker;
+
+        advMarker.addListener('dragend', () => {
+          const pos = advMarker.position;
+          if (pos) {
+            const lat = typeof pos.lat === 'function' ? pos.lat() : Number(pos.lat);
+            const lng = typeof pos.lng === 'function' ? pos.lng() : Number(pos.lng);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              updateMarkerPosition(lat, lng);
+              updateLocationFromCoordsRef.current(lat, lng);
+            }
+          }
+        });
+      } else {
+        const legacyMarker = new google.maps.Marker({
+          position: { lat: currentLat, lng: currentLng },
+          map,
+          draggable: true,
+          animation: google.maps.Animation.DROP,
+          title: 'Drag to adjust your location',
+        });
+        markerInstanceRef.current = legacyMarker;
+
+        legacyMarker.addListener('dragend', () => {
+          const pos = legacyMarker.getPosition();
+          if (pos) {
+            const lat = pos.lat();
+            const lng = pos.lng();
             updateMarkerPosition(lat, lng);
             updateLocationFromCoordsRef.current(lat, lng);
           }
-        }
-      });
-    } else {
-      const legacyMarker = new google.maps.Marker({
-        position: { lat: currentLat, lng: currentLng },
-        map,
-        draggable: true,
-        animation: google.maps.Animation.DROP,
-        title: 'Drag to adjust your location',
-      });
-      markerInstanceRef.current = legacyMarker;
+        });
+      }
 
-      legacyMarker.addListener('dragend', () => {
-        const pos = legacyMarker.getPosition();
-        if (pos) {
-          const lat = pos.lat();
-          const lng = pos.lng();
+      // Handle map click to drop and move pin
+      map.addListener('click', (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
           updateMarkerPosition(lat, lng);
           updateLocationFromCoordsRef.current(lat, lng);
         }
       });
+
+      // Ensure map tiles properly layout after mounting
+      timer = setTimeout(() => {
+        if (mapInstanceRef.current && window.google?.maps?.event) {
+          google.maps.event.trigger(mapInstanceRef.current, 'resize');
+        }
+      }, 120);
+    } catch (mapErr) {
+      console.warn('Failed to initialize Google Map in LocationModal:', mapErr);
     }
-
-    // Handle map click to drop and move pin
-    map.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        const lat = e.latLng.lat();
-        const lng = e.latLng.lng();
-        updateMarkerPosition(lat, lng);
-        updateLocationFromCoordsRef.current(lat, lng);
-      }
-    });
-
-    // Ensure map tiles properly layout after mounting
-    const timer = setTimeout(() => {
-      if (mapInstanceRef.current) {
-        google.maps.event.trigger(mapInstanceRef.current, 'resize');
-      }
-    }, 120);
 
     // Clean up instances when unmounting or closing modal
     return () => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       mapInstanceRef.current = null;
       markerInstanceRef.current = null;
     };
@@ -804,24 +814,22 @@ export const LocationModal: React.FC<LocationModalProps> = ({
               {/* Google Map Container Canvas */}
               <div ref={mapContainerRef} className="w-full h-full" />
 
-              {/* Floating Map Overlay: Center on GPS */}
-              <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
+              {/* Floating Map Overlays: Top Header Toolbar (Hint on left, GPS on right) */}
+              <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none z-10">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/85 dark:bg-black/85 backdrop-blur-md text-white text-[11px] font-medium shadow-md border border-white/10 shrink min-w-0">
+                  <span className="shrink-0 text-xs">📍</span>
+                  <span className="truncate">Drag pin or click map to set location</span>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleRetryGPS}
                   title="Locate my position via browser GPS"
-                  className="p-2 sm:p-2.5 rounded-xl bg-white/95 dark:bg-zinc-900/95 text-zinc-800 dark:text-white shadow-lg backdrop-blur-md hover:bg-white dark:hover:bg-zinc-900 active:scale-95 transition-all border border-zinc-200 dark:border-zinc-700 cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                  className="pointer-events-auto shrink-0 p-2 sm:px-3 sm:py-2 rounded-xl bg-white/95 dark:bg-zinc-900/95 text-zinc-800 dark:text-white shadow-lg backdrop-blur-md hover:bg-white dark:hover:bg-zinc-900 active:scale-95 transition-all border border-zinc-200 dark:border-zinc-700 cursor-pointer flex items-center gap-1.5 text-xs font-bold"
                 >
                   <Navigation className="w-4 h-4 text-orange-500" />
                   <span className="hidden sm:inline">My GPS</span>
                 </button>
-              </div>
-
-              {/* Floating Bottom Hint Banner */}
-              <div className="absolute bottom-2 left-2 right-2 pointer-events-none z-10">
-                <div className="px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md text-white text-[11px] font-medium text-center shadow-md border border-white/10">
-                  📍 Drag the pin or click anywhere on the map to set location
-                </div>
               </div>
             </div>
           </div>

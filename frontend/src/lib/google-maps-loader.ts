@@ -1,11 +1,17 @@
+import { ENV } from '../config/env';
+
 let googleMapsPromise: Promise<typeof google.maps> | null = null;
 
 export const getGoogleMapsApiKey = (): string => {
-  return (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '').trim();
+  return ENV.GOOGLE_MAPS_API_KEY.trim();
 };
 
 export const isGoogleMapsReady = (): boolean => {
-  return typeof window !== 'undefined' && !!window.google?.maps?.places;
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.google?.maps?.Map === 'function' &&
+    !!window.google?.maps?.places
+  );
 };
 
 /**
@@ -27,19 +33,53 @@ export const loadGoogleMaps = (apiKeyOverride?: string): Promise<typeof google.m
 
   const apiKey = apiKeyOverride || getGoogleMapsApiKey();
   if (!apiKey) {
-    return Promise.reject(new Error('Google Maps API key is not configured (VITE_GOOGLE_MAPS_API_KEY)'));
+    return Promise.reject(
+      new Error('Google Maps API key is not configured (VITE_GOOGLE_MAPS_API_KEY)'),
+    );
   }
 
   googleMapsPromise = new Promise((resolve, reject) => {
+    const finishInit = async () => {
+      try {
+        if (typeof window.google?.maps?.importLibrary === 'function') {
+          await Promise.all([
+            window.google.maps.importLibrary('maps'),
+            window.google.maps.importLibrary('places'),
+            window.google.maps.importLibrary('marker'),
+          ]);
+        }
+      } catch (err) {
+        console.warn('Google Maps importLibrary warning:', err);
+      }
+
+      if (isGoogleMapsReady()) {
+        resolve(window.google.maps);
+        return;
+      }
+
+      // Check with brief polling in case constructor takes a tick to attach
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (isGoogleMapsReady()) {
+          clearInterval(interval);
+          resolve(window.google.maps);
+        } else if (attempts >= 10) {
+          clearInterval(interval);
+          if (typeof window.google?.maps?.Map === 'function') {
+            resolve(window.google.maps);
+          } else {
+            reject(new Error('Google Maps SDK loaded without required Map constructor.'));
+          }
+        }
+      }, 50);
+    };
+
     // Check if script tag is already in DOM
     const existingScript = document.getElementById('google-maps-script') as HTMLScriptElement | null;
     if (existingScript) {
       existingScript.addEventListener('load', () => {
-        if (window.google?.maps) {
-          resolve(window.google.maps);
-        } else {
-          reject(new Error('Google Maps object failed to initialize.'));
-        }
+        finishInit().catch(reject);
       });
       existingScript.addEventListener('error', () => {
         reject(new Error('Failed to load Google Maps script. Check your API key.'));
@@ -52,28 +92,19 @@ export const loadGoogleMaps = (apiKeyOverride?: string): Promise<typeof google.m
     script.type = 'text/javascript';
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
       apiKey,
-    )}&libraries=places,geometry,marker&loading=async`;
+    )}&libraries=places,geometry,marker&v=weekly`;
     script.async = true;
     script.defer = true;
 
     script.onload = () => {
-      if (window.google?.maps?.places) {
-        resolve(window.google.maps);
-      } else {
-        // Wait brief tick in case libraries load asynchronously
-        setTimeout(() => {
-          if (window.google?.maps) {
-            resolve(window.google.maps);
-          } else {
-            reject(new Error('Google Maps SDK loaded without required libraries.'));
-          }
-        }, 150);
-      }
+      finishInit().catch(reject);
     };
 
     script.onerror = () => {
       googleMapsPromise = null;
-      reject(new Error('Failed to load Google Maps SDK. Please check your network or API key permissions.'));
+      reject(
+        new Error('Failed to load Google Maps SDK. Please check your network or API key permissions.'),
+      );
     };
 
     document.head.appendChild(script);

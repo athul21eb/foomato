@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   UtensilsCrossed,
   ArrowRight,
@@ -12,12 +12,9 @@ import {
   Heart,
   Search,
   MapPin,
-  Star,
   Award,
   Flame,
-  CheckCircle,
   Smartphone,
-  ChevronRight,
   TrendingUp,
   Loader2,
   Navigation,
@@ -29,137 +26,9 @@ import { fetchCurrentLocation } from "../slices/location/locationSlice";
 import { toast } from "sonner";
 import { LocationModal } from "../components/ui/location-modal";
 import { LoadingScreen } from "../components/feedback/loading-screen";
-
-interface CategoryItem {
-  id: string;
-  name: string;
-  emoji: string;
-  places: string;
-  tag: string;
-}
-
-const CATEGORIES: CategoryItem[] = [
-  {
-    id: "1",
-    name: "Artisan Pizza",
-    emoji: "🍕",
-    places: "38 places",
-    tag: "Trending",
-  },
-  {
-    id: "2",
-    name: "Gourmet Burgers",
-    emoji: "🍔",
-    places: "44 places",
-    tag: "Fast",
-  },
-  {
-    id: "3",
-    name: "Tokyo Sushi & Bowls",
-    emoji: "🍣",
-    places: "21 places",
-    tag: "Premium",
-  },
-  {
-    id: "4",
-    name: "Spicy Dumplings & Wok",
-    emoji: "🥟",
-    places: "29 places",
-    tag: "Popular",
-  },
-  {
-    id: "5",
-    name: "Indian Tandoor & Curries",
-    emoji: "🍛",
-    places: "32 places",
-    tag: "Chef Choice",
-  },
-  {
-    id: "6",
-    name: "Crispy Taco Fiesta",
-    emoji: "🌮",
-    places: "19 places",
-    tag: "Offers",
-  },
-  {
-    id: "7",
-    name: "Healthy Greens & Acai",
-    emoji: "🥗",
-    places: "16 places",
-    tag: "Clean Eat",
-  },
-  {
-    id: "8",
-    name: "Pastries & Desserts",
-    emoji: "🍰",
-    places: "25 places",
-    tag: "Sweet",
-  },
-];
-
-interface RestaurantItem {
-  id: string;
-  name: string;
-  cuisine: string;
-  rating: number;
-  reviews: string;
-  deliveryTime: string;
-  minOrder: string;
-  offer: string;
-  imageBg: string;
-  tags: string[];
-}
-
-const FEATURED_RESTAURANTS: RestaurantItem[] = [
-  {
-    id: "r1",
-    name: "The Rustic Neapolitan",
-    cuisine: "Authentic Italian • Wood-fired Pizza",
-    rating: 4.9,
-    reviews: "1.4k+",
-    deliveryTime: "20-30 min",
-    minOrder: "$15 min",
-    offer: "20% OFF ABOVE $30",
-    imageBg: "from-amber-600/30 to-red-600/40",
-    tags: ["Pizza", "Italian", "Vegetarian"],
-  },
-  {
-    id: "r2",
-    name: "Umami Craft Smash Burgers",
-    cuisine: "American Prime • Loaded Fries",
-    rating: 4.8,
-    reviews: "980+",
-    deliveryTime: "15-25 min",
-    minOrder: "$12 min",
-    offer: "FREE DELIVERY",
-    imageBg: "from-orange-600/30 to-amber-700/40",
-    tags: ["Burgers", "Late Night", "Fast"],
-  },
-  {
-    id: "r3",
-    name: "Kyoto Secret Ramen Bar",
-    cuisine: "Japanese • Tonkotsu & Gyoza",
-    rating: 4.9,
-    reviews: "2.1k+",
-    deliveryTime: "25-35 min",
-    minOrder: "$20 min",
-    offer: "COMPLIMENTARY GYOZA",
-    imageBg: "from-rose-600/30 to-red-800/40",
-    tags: ["Ramen", "Japanese", "Hot Broth"],
-  },
-  {
-    id: "r4",
-    name: "Botanica Superfood Bowls",
-    cuisine: "Plant-Based • Cold Pressed Juices",
-    rating: 4.7,
-    reviews: "640+",
-    deliveryTime: "15-20 min",
-    minOrder: "$10 min",
-    offer: "HEALTHY WEEKDAY 15%",
-    imageBg: "from-emerald-600/30 to-teal-800/40",
-    tags: ["Organic", "Vegan", "Bowls"],
-  },
-];
+import { useNearbySellers } from "../features/seller/hooks/use-sellers";
+import { SellerCard } from "../features/seller/components/seller-card";
+import { useDebounce } from "../lib/use-debounce";
 
 export const HomePage: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -167,10 +36,62 @@ export const HomePage: React.FC = () => {
   const dispatch = useAppDispatch();
   const locationState = useAppSelector((state) => state.location);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [selectedFilter, setSelectedFilter] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
+  const urlSearch = searchParams.get("search") || "";
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
+  const [prevUrlSearch, setPrevUrlSearch] = useState(urlSearch);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
+
+  // 5-second debounce on live search query as requested
+  const debouncedSearchQuery = useDebounce(searchQuery, 5000);
+
+  // If user explicitly pressed Enter or clicked Explore, use submittedQuery immediately; otherwise use debounced value
+  const activeSearchQuery =
+    submittedQuery !== null ? submittedQuery : debouncedSearchQuery;
+
+  if (prevUrlSearch !== urlSearch) {
+    setPrevUrlSearch(urlSearch);
+    setSearchQuery(urlSearch);
+    setSubmittedQuery(urlSearch);
+  }
+
+  const handleQueryChange = (val: string) => {
+    setSearchQuery(val);
+    // Reset manual submit override when user resumes typing so debouncing kicks in
+    setSubmittedQuery(null);
+  };
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = searchQuery.trim();
+    setSubmittedQuery(query);
+    if (query) {
+      setSearchParams({ search: query });
+    } else {
+      setSearchParams({});
+    }
+
+    const target =
+      document.getElementById("restaurants") ||
+      document.getElementById("sellers");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  // TanStack Query for live nearby restaurants based on GPS location & debounced search
+  const {
+    data: nearbyData,
+    isLoading: isRestaurantsLoading,
+  } = useNearbySellers({
+    latitude: locationState.coords?.latitude,
+    longitude: locationState.coords?.longitude,
+    search: activeSearchQuery,
+  });
+
+  const liveRestaurants = nearbyData?.restaurants || [];
 
   // If a seller or rider visits the consumer home page, smoothly redirect to their dedicated dashboard
   useEffect(() => {
@@ -201,14 +122,6 @@ export const HomePage: React.FC = () => {
       dispatch(fetchCurrentLocation());
     }
   };
-
-  const filterChips = [
-    "All",
-    "Fast Delivery (<25m)",
-    "Top Rated (4.8+)",
-    "Offers & Deals",
-    "Pure Veg",
-  ];
 
   if (
     !isLoading &&
@@ -251,7 +164,8 @@ export const HomePage: React.FC = () => {
           </p>
 
           {/* Interactive Search & Location Box */}
-          <div
+          <form
+            onSubmit={handleSearchSubmit}
             className={`w-full max-w-2xl p-2.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all mb-8 flex flex-col sm:flex-row items-center gap-2 ${
               theme === "dark" ?
                 "bg-zinc-900/80 border-zinc-800 shadow-black/50"
@@ -298,20 +212,26 @@ export const HomePage: React.FC = () => {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search pizzas, ramen, restaurants, or dishes..."
+                onChange={(e) => handleQueryChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearchSubmit();
+                  }
+                }}
+                placeholder="Search pizzas, burgers, dishes, or sellers..."
                 className="w-full bg-transparent text-sm outline-none text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 font-medium"
               />
             </div>
 
-            <a
-              href="#restaurants"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-1.5 shrink-0"
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
             >
               <span>Explore</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
+            </button>
+          </form>
 
           {/* Action CTAs */}
           <div className="flex flex-wrap items-center justify-center gap-4 w-full sm:w-auto">
@@ -325,7 +245,7 @@ export const HomePage: React.FC = () => {
                   <span>Order Food Now</span>
                 </a>
                 <a
-                  href="#categories"
+                  href="#restaurants"
                   className={`px-8 py-3.5 rounded-2xl font-bold text-sm border transition-all flex items-center justify-center gap-2 ${
                     theme === "dark" ?
                       "border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-200"
@@ -333,7 +253,7 @@ export const HomePage: React.FC = () => {
                   }`}
                 >
                   <Flame className="w-4 h-4 text-orange-500" />
-                  <span>Browse Cuisines</span>
+                  <span>Browse Sellers</span>
                 </a>
               </div>
             : <div className="flex flex-wrap items-center justify-center gap-4">
@@ -359,112 +279,10 @@ export const HomePage: React.FC = () => {
             }
           </div>
 
-          {/* Logged in User Status Box (informational only - NO role change button) */}
-          {isAuthenticated && user && (
-            <div
-              className={`mt-10 p-5 rounded-3xl border backdrop-blur-md max-w-xl w-full flex items-center gap-4 text-left transition-all ${
-                theme === "dark" ?
-                  "bg-zinc-900/70 border-zinc-800 text-zinc-200 shadow-black/40"
-                : "bg-white/90 border-zinc-200 text-zinc-800 shadow-xl shadow-zinc-200/50"
-              }`}
-            >
-              <img
-                src={user.image || "https://via.placeholder.com/60"}
-                alt={user.name}
-                className="w-13 h-13 rounded-2xl object-cover ring-2 ring-orange-500/40"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-base leading-tight">
-                    {user.name}
-                  </h3>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 border border-orange-500/20">
-                    {user.role || "Member"}
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-500 mt-0.5">{user.email}</p>
-                <p className="text-xs text-emerald-500 font-medium mt-1 flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <span>Authenticated • Role Assigned</span>
-                </p>
-              </div>
-              <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-500 shrink-0">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
-      {/* 2. POPULAR CATEGORIES & CUISINES SECTION */}
-      <section
-        id="categories"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full"
-      >
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-500 border border-orange-500/20 mb-2">
-              <Flame className="w-3.5 h-3.5" />
-              <span>Gastronomy Categories</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Inspiration for Your Next Meal
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-zinc-500 max-w-md">
-            Hand-curated collections crafted by our culinary experts and local
-            neighborhood favorites.
-          </p>
-        </div>
-
-        {/* Filter Chips Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 no-scrollbar touch-pan-x">
-          {filterChips.map((chip) => (
-            <button
-              key={chip}
-              onClick={() => setSelectedFilter(chip)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                selectedFilter === chip ?
-                  "bg-orange-500 text-white shadow-md shadow-orange-500/25"
-                : theme === "dark" ?
-                  "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-                : "bg-zinc-100 border border-zinc-200 text-zinc-700 hover:text-zinc-950 hover:bg-zinc-200"
-              }`}
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
-
-        {/* Category Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-          {CATEGORIES.map((item) => (
-            <div
-              key={item.id}
-              className={`p-4 rounded-2xl border text-center transition-all duration-300 hover:-translate-y-1.5 cursor-pointer group ${
-                theme === "dark" ?
-                  "bg-zinc-900/60 border-zinc-800 hover:border-orange-500/40 hover:bg-zinc-850"
-                : "bg-white border-zinc-200 hover:border-orange-500/40 hover:shadow-md"
-              }`}
-            >
-              <div className="text-3xl mb-2 group-hover:scale-115 transition-transform">
-                {item.emoji}
-              </div>
-              <h4 className="font-bold text-xs sm:text-sm line-clamp-1 mb-0.5">
-                {item.name}
-              </h4>
-              <span className="text-[11px] text-zinc-500 block">
-                {item.places}
-              </span>
-              <span className="mt-2 inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-500">
-                {item.tag}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 3. FEATURED RESTAURANTS SHOWCASE */}
+      {/* 3. LIVE NEARBY RESTAURANTS SHOWCASE */}
       <section
         id="restaurants"
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full"
@@ -473,91 +291,107 @@ export const HomePage: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-2">
               <Award className="w-3.5 h-3.5" />
-              <span>Top Rated Kitchens</span>
+              <span>Live Verified Kitchens</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Trending Restaurants in Your Area
+              {locationState.city
+                ? `Sellers near ${locationState.city}`
+                : "Trending Sellers Near You"}
             </h2>
           </div>
-          <span className="text-xs font-semibold text-orange-500 cursor-pointer hover:underline flex items-center gap-1">
-            <span>View All 184 Kitchens</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {FEATURED_RESTAURANTS.map((resto) => (
-            <div
-              key={resto.id}
-              className={`rounded-3xl border overflow-hidden transition-all duration-300 hover:-translate-y-1.5 group flex flex-col ${
-                theme === "dark" ?
-                  "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
-                : "bg-white border-zinc-200 hover:border-zinc-300 shadow-sm hover:shadow-xl"
-              }`}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleOpenLocationPopup}
+              className="text-xs font-bold text-orange-500 hover:underline flex items-center gap-1 cursor-pointer"
             >
-              {/* Card Banner with Gradient & Promo Tag */}
-              <div
-                className={`h-40 bg-gradient-to-tr ${resto.imageBg} relative p-4 flex flex-col justify-between`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-black/60 text-white backdrop-blur-md">
-                    {resto.offer}
-                  </span>
-                  <button className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-md flex items-center justify-center text-white transition-colors">
-                    <Heart className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-xs font-bold shadow-md">
-                    <Star className="w-3 h-3 fill-white" />
-                    <span>{resto.rating}</span>
-                  </div>
-                  <span className="text-xs text-white/90 font-medium drop-shadow-md">
-                    ({resto.reviews})
-                  </span>
-                </div>
-              </div>
-
-              {/* Card Body */}
-              <div className="p-5 flex flex-col flex-1 justify-between">
-                <div>
-                  <h3 className="font-bold text-base group-hover:text-orange-500 transition-colors mb-1">
-                    {resto.name}
-                  </h3>
-                  <p className="text-xs text-zinc-500 mb-3 line-clamp-1">
-                    {resto.cuisine}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {resto.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
-                          theme === "dark" ?
-                            "bg-zinc-800 text-zinc-400"
-                          : "bg-zinc-100 text-zinc-600"
-                        }`}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-zinc-500/10 flex items-center justify-between text-xs text-zinc-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-orange-500" />
-                    <span>{resto.deliveryTime}</span>
-                  </div>
-                  <span className="font-semibold text-zinc-600 dark:text-zinc-400">
-                    {resto.minOrder}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{locationState.city || locationState.address || "Select Pin"}</span>
+            </button>
+            {nearbyData && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                {nearbyData.count} Available
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* State 1: No GPS Coords Detected */}
+        {!locationState.coords && locationState.status !== "loading" ? (
+          <div className="p-8 sm:p-12 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-800 text-center flex flex-col items-center justify-center bg-zinc-50/50 dark:bg-zinc-900/30">
+            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-4">
+              <MapPin className="w-7 h-7" />
+            </div>
+            <h3 className="font-extrabold text-lg text-zinc-900 dark:text-white mb-2">
+              Set Your Delivery Pin
+            </h3>
+            <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mb-5 leading-relaxed">
+              Detect your browser GPS or choose your street address to see active kitchens delivering to your door.
+            </p>
+            <button
+              type="button"
+              onClick={handleOpenLocationPopup}
+              className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-md shadow-orange-500/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              <span>Choose Location</span>
+            </button>
+          </div>
+        ) : isRestaurantsLoading || locationState.status === "loading" ? (
+          /* State 2: Loading Skeletons */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((n) => (
+              <div
+                key={n}
+                className="rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/40 dark:bg-zinc-900/40 p-4 space-y-4 animate-pulse"
+              >
+                <div className="aspect-4/3 w-full rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-5 w-3/4 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-3 w-1/2 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+              </div>
+            ))}
+          </div>
+        ) : liveRestaurants.length > 0 ? (
+          /* State 3: Live Nearby Restaurant Cards */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {liveRestaurants.map((resto) => (
+              <SellerCard key={resto.id} seller={resto} />
+            ))}
+          </div>
+        ) : (
+          /* State 4: Empty Results */
+          <div className="p-12 rounded-3xl border border-zinc-200 dark:border-zinc-800 text-center flex flex-col items-center justify-center bg-zinc-50/50 dark:bg-zinc-900/40">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center mb-4">
+              <UtensilsCrossed className="w-7 h-7" />
+            </div>
+            <h3 className="font-extrabold text-base sm:text-lg text-zinc-900 dark:text-white mb-1">
+              No kitchens found nearby
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mb-5">
+              {searchQuery
+                ? `We couldn't find any sellers matching "${searchQuery}" in your current radius.`
+                : "There are no verified sellers within 5km of your selected location."}
+            </p>
+            <div className="flex items-center gap-3">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="px-4 py-2 rounded-xl text-xs font-bold border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  Clear Search
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleOpenLocationPopup}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white shadow-xs hover:brightness-110 transition-colors cursor-pointer"
+              >
+                Change Pin Location
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 4. ECOSYSTEM METRICS & TRUST COUNTER */}
@@ -721,35 +555,7 @@ export const HomePage: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Customer */}
-          <div
-            className={`p-8 rounded-3xl border transition-all duration-300 hover:-translate-y-1 ${
-              theme === "dark" ?
-                "bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700"
-              : "bg-white border-zinc-200 hover:border-zinc-300 shadow-sm"
-            }`}
-          >
-            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-6">
-              <UtensilsCrossed className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Food Lovers</h3>
-            <p className="text-sm text-zinc-500 leading-relaxed mb-6">
-              Browse hyper-local menus, customize dishes with add-ons, and track
-              your meals with instant live GPS updates.
-            </p>
-            <ul className="text-xs space-y-2 text-zinc-500">
-              <li className="flex items-center gap-2">
-                <Zap className="w-3.5 h-3.5 text-orange-500" />
-                <span>30-minute average delivery window</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>100% Verified kitchen hygiene audits</span>
-              </li>
-            </ul>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {/* Rider */}
           <div
             className={`p-8 rounded-3xl border transition-all duration-300 hover:-translate-y-1 ${
@@ -789,7 +595,7 @@ export const HomePage: React.FC = () => {
             <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mb-6">
               <Store className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-bold mb-2">Restaurant Sellers</h3>
+            <h3 className="text-xl font-bold mb-2">Kitchen & Store Sellers</h3>
             <p className="text-sm text-zinc-500 leading-relaxed mb-6">
               Command your digital storefront, automate kitchen tickets, and
               monitor revenue metrics effortlessly.

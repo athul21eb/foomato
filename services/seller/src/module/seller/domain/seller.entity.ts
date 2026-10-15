@@ -14,6 +14,8 @@ export class SellerEntity {
   isVerified: boolean;
   autoLocation: AutoLocation;
   isOpen: boolean;
+  distance?: number;
+  distanceKm?: number;
   createdAt?: Date;
   updatedAt?: Date;
 

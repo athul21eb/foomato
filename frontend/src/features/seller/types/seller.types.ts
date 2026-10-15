@@ -18,6 +18,23 @@ export interface Seller {
   updatedAt?: string;
 }
 
+export interface NearbySeller extends Seller {
+  distance?: number;
+  distanceKm?: number;
+}
+
+export interface GetNearbySellersParams {
+  latitude: number;
+  longitude: number;
+  radius?: number;
+  search?: string;
+}
+
+export interface NearbySellersResponse {
+  count: number;
+  restaurants: NearbySeller[];
+}
+
 export interface CreateSellerDto {
   name: string;
   description: string;

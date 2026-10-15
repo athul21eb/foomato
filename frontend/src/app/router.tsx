@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { RootLayout } from '../layouts/root-layout';
 import { ErrorPage } from '../pages/error-page';
 import { LoadingScreen } from '../components/feedback/loading-screen';
@@ -13,6 +13,11 @@ const HomePage = lazy(() =>
 const CustomerAccountPage = lazy(() =>
   import('../pages/customer/account-page').then((m) => ({
     default: m.CustomerAccountPage,
+  })),
+);
+const SellerDetailsPage = lazy(() =>
+  import('../pages/customer/seller-details-page').then((m) => ({
+    default: m.SellerDetailsPage,
   })),
 );
 const NotFoundPage = lazy(() =>
@@ -50,6 +55,14 @@ export const router = createBrowserRouter([
         path: 'account',
         element: withSuspense(CustomerAccountPage),
       },
+      {
+        path: 'restaurant/:id',
+        element: withSuspense(SellerDetailsPage),
+      },
+      {
+        path: 'seller-store/:id',
+        element: withSuspense(SellerDetailsPage),
+      },
       // Modular Feature Sub-Trees
       sellerRoutes,
     ],
@@ -65,4 +78,9 @@ export const router = createBrowserRouter([
   },
 ]);
 
-export default router;
+export const AppRouter: React.FC = () => {
+  return <RouterProvider router={router} />;
+};
+
+export default AppRouter;
+

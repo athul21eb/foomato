@@ -13,10 +13,10 @@ export interface GooglePayload {
 export class GoogleService {
   private readonly logger = new Logger(GoogleService.name);
   private readonly client: OAuth2Client;
-  private readonly clientId: string | undefined;
+  private readonly clientId: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    this.clientId = this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID');
     this.client = new OAuth2Client(this.clientId);
   }
 

@@ -10,7 +10,7 @@ import { UploadService } from './upload.service';
 import { UploadImageDto } from './dto/upload-image.dto';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 
-@Controller(['upload', 'api/upload'])
+@Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 

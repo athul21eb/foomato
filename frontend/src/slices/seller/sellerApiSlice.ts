@@ -18,11 +18,10 @@ import type {
   UpdateMenuItemStatusDto,
 } from '../../features/seller/types/seller.types';
 import { requestRefreshToken } from '../../app/api/auth/authenticationApiSlice';
+import { ENV } from '../../config/env';
 
-const SELLER_API_URL =
-  import.meta.env.VITE_SELLER_API_URL || 'http://localhost:5001';
-const UTILS_API_URL =
-  import.meta.env.VITE_UTILS_API_URL || 'http://localhost:5002';
+const SELLER_API_URL = ENV.SELLER_API_URL;
+const UTILS_API_URL = ENV.UTILS_API_URL;
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: SELLER_API_URL,
@@ -119,7 +118,7 @@ export const sellerApiSlice = createApi({
 
     uploadImage: builder.mutation<UploadResponse, FormData>({
       query: (formData) => ({
-        url: `${UTILS_API_URL}/api/upload`,
+        url: `${UTILS_API_URL}/upload`,
         method: 'POST',
         body: formData,
       }),
