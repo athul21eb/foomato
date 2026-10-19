@@ -43,4 +43,34 @@ export const deliveryAddressSchema = z.object({
     .optional(),
 });
 
-export type DeliveryAddressFormValues = z.infer<typeof deliveryAddressSchema>;
+export const customerAddressFormSchema = z.object({
+  mobile: z
+    .string()
+    .trim()
+    .min(1, 'Mobile number is required')
+    .regex(/^[0-9]{10}$/, 'Mobile number must be a valid 10-digit number'),
+  formattedAddress: z
+    .string()
+    .trim()
+    .min(5, 'Delivery address is required (minimum 5 characters)')
+    .max(300, 'Address cannot exceed 300 characters'),
+  instructions: z
+    .string()
+    .trim()
+    .max(250, 'Instructions cannot exceed 250 characters')
+    .optional(),
+  latitude: z
+    .number({
+      required_error: 'Please pick a location from the map',
+      invalid_type_error: 'Please pick a location from the map',
+    })
+    .refine((val) => val >= -90 && val <= 90, 'Invalid latitude coordinate'),
+  longitude: z
+    .number({
+      required_error: 'Please pick a location from the map',
+      invalid_type_error: 'Please pick a location from the map',
+    })
+    .refine((val) => val >= -180 && val <= 180, 'Invalid longitude coordinate'),
+});
+
+export type CustomerAddressFormValues = z.infer<typeof customerAddressFormSchema>;

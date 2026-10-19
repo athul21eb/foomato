@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   UtensilsCrossed,
   Search,
   AlertCircle,
   Plus,
+  Minus,
+  ShoppingBag,
 } from 'lucide-react';
 import {
   useSellerDetails,
@@ -13,15 +15,44 @@ import {
 } from '../../features/seller/hooks/use-sellers';
 import { SellerProfileView } from '../../features/seller/components/seller-profile-view';
 import { LoadingScreen } from '../../components/feedback/loading-screen';
+import type { Seller } from '../../features/seller/types/seller.types';
+import { useCart } from '../../features/cart/hooks/useCart';
+import { RestaurantConflictModal } from '../../features/cart/components/restaurant-conflict-modal';
+import { formatCurrency } from '../../lib/utils';
 
 export const SellerDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const routeSeller = location.state?.seller as Seller | undefined;
 
   const {
-    data: seller,
+    items: cartItems,
+    sellerId: cartSellerId,
+    sellerName: cartSellerName,
+    totalQuantity: cartTotalQuantity,
+    totalAmount: cartTotalAmount,
+    addToCart: addDishToCart,
+    incrementItem,
+    decrementItem,
+    conflictModalOpen,
+    pendingItem,
+    confirmSwitchRestaurantAndAdd,
+    cancelConflict,
+  } = useCart();
+
+  const {
+    data: fetchedSeller,
     isLoading: isSellerLoading,
     error: sellerError,
   } = useSellerDetails(id);
+
+  const seller = fetchedSeller
+    ? {
+        ...fetchedSeller,
+        distanceKm: fetchedSeller.distanceKm ?? routeSeller?.distanceKm,
+        distance: fetchedSeller.distance ?? routeSeller?.distance,
+      }
+    : routeSeller;
 
   const {
     data: menuItems = [],
@@ -31,7 +62,7 @@ export const SellerDetailsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [vegFilter, setVegFilter] = useState<'all' | 'veg' | 'nonveg'>('all');
 
-  if (isSellerLoading) {
+  if (isSellerLoading && !seller) {
     return (
       <LoadingScreen
         message="Loading seller details..."
@@ -200,7 +231,7 @@ export const SellerDetailsPage: React.FC = () => {
                     </div>
 
                     <div className="text-sm font-extrabold text-orange-500 mb-1.5">
-                      ${Number(item.price).toFixed(2)}
+                      {formatCurrency(item.price)}
                     </div>
 
                     {item.description && (
@@ -224,16 +255,59 @@ export const SellerDetailsPage: React.FC = () => {
                       loading="lazy"
                       className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
-                    {item.isAvailable && (
-                      <button
-                        type="button"
-                        className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-zinc-950 shadow-md hover:bg-orange-500 hover:text-white transition-all duration-200 flex items-center gap-1 cursor-pointer"
-                        title="Add to order"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add</span>
-                      </button>
-                    )}
+                    {item.isAvailable && (() => {
+                      const cartItem = cartItems.find((ci) => ci.id === item.id);
+                      const qtyInCart = cartItem?.quantity || 0;
+
+                      if (qtyInCart === 0) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addDishToCart({
+                                id: item.id,
+                                name: item.name,
+                                price: item.price,
+                                image: item.image,
+                                isVeg: item.isVeg,
+                                sellerId: seller.id,
+                                sellerName: seller.name,
+                                description: item.description,
+                              });
+                            }}
+                            className="group/btn absolute bottom-2 right-2 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-zinc-950 shadow-md hover:bg-orange-500 hover:text-white transition-all duration-200 flex items-center gap-1.5 cursor-pointer backdrop-blur-xs"
+                            title="Add to cart"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5 text-orange-500 group-hover/btn:text-white transition-colors" />
+                            <span>Add</span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-orange-500 text-white rounded-lg shadow-md p-0.5 text-xs font-bold">
+                          <button
+                            type="button"
+                            onClick={() => decrementItem(item.id)}
+                            className="w-6 h-6 flex items-center justify-center hover:bg-black/20 rounded-md transition-colors cursor-pointer"
+                            title="Decrease quantity"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-5 text-center font-extrabold text-xs">
+                            {qtyInCart}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => incrementItem(item.id)}
+                            className="w-6 h-6 flex items-center justify-center hover:bg-black/20 rounded-md transition-colors cursor-pointer"
+                            title="Increase quantity"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -254,6 +328,43 @@ export const SellerDetailsPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Floating View Cart Bar */}
+        {cartTotalQuantity > 0 && cartSellerId === seller.id && (
+          <div className="fixed bottom-6 left-4 right-4 z-30 max-w-lg mx-auto">
+            <Link
+              to="/cart"
+              className="flex items-center justify-between px-5 py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-xl shadow-orange-500/30 hover:brightness-110 active:scale-98 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                  <ShoppingBag className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-black">
+                    {cartTotalQuantity} {cartTotalQuantity === 1 ? 'item' : 'items'} in cart
+                  </span>
+                  <span className="text-[11px] opacity-90">
+                    {formatCurrency(cartTotalAmount)} total
+                  </span>
+                </div>
+              </div>
+
+              <span className="text-xs font-black tracking-wide flex items-center gap-1">
+                View Cart →
+              </span>
+            </Link>
+          </div>
+        )}
+
+        {/* Multi-Restaurant Switch Conflict Modal */}
+        <RestaurantConflictModal
+          isOpen={conflictModalOpen}
+          currentRestaurantName={cartSellerName}
+          pendingItem={pendingItem}
+          onConfirm={confirmSwitchRestaurantAndAdd}
+          onCancel={cancelConflict}
+        />
       </div>
     </div>
   );

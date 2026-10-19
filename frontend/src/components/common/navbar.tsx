@@ -13,6 +13,7 @@ import { ThemeToggle } from './theme-toggle';
 import { useTheme } from '../../context/use-theme';
 import { LogoutModal } from '../ui/logout-modal';
 import { toast } from 'sonner';
+import { useAppSelector } from '../../app/hooks';
 
 interface RoleNavProps {
   onOpenLogout: () => void;
@@ -208,6 +209,7 @@ const RiderNavbar: React.FC<RoleNavProps> = ({ onOpenLogout }) => {
 const CustomerNavbar: React.FC<RoleNavProps> = ({ onOpenLogout }) => {
   const { user, isAuthenticated } = useAuth();
   const { theme } = useTheme();
+  const cartTotalQuantity = useAppSelector((state) => state.cart.totalQuantity);
 
   return (
     <header
@@ -269,22 +271,24 @@ const CustomerNavbar: React.FC<RoleNavProps> = ({ onOpenLogout }) => {
         <div className="flex items-center gap-3">
           <ThemeToggle />
 
-          {/* Cart Icon - Exclusively for Customer role */}
-          {isAuthenticated && user?.role === 'customer' && (
+          {/* Cart Icon - Redirects to /cart blank page */}
+          {(!user || user.role === 'customer') && (
             <Link
               id="nav-cart-btn"
-              to="/account"
-              title="Customer Cart & Orders"
-              className={`relative p-2.5 rounded-2xl border transition-all flex items-center justify-center group ${
+              to="/cart"
+              title="Shopping Cart"
+              className={`relative p-2.5 rounded-2xl border transition-all flex items-center justify-center group cursor-pointer ${
                 theme === 'dark'
                   ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-orange-400 hover:border-orange-500/40'
                   : 'bg-white border-zinc-200 text-zinc-700 hover:text-orange-600 hover:border-orange-500/40 shadow-xs'
               }`}
             >
               <ShoppingBag className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" />
-              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-md shadow-orange-500/30">
-                1
-              </span>
+              {cartTotalQuantity > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-md shadow-orange-500/30">
+                  {cartTotalQuantity}
+                </span>
+              )}
             </Link>
           )}
 

@@ -30,6 +30,7 @@ import {
   type MenuItemFormValues,
 } from '../schemas/seller.schema';
 import type { MenuItem } from '../types/seller.types';
+import { formatCurrency, getCurrencySymbol } from '../../../lib/utils';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -373,7 +374,7 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
                     {/* Price Tag Overlay */}
                     <div className="absolute bottom-3 left-3">
                       <span className="text-lg font-black text-white drop-shadow-md">
-                        ₹{item.price.toFixed(2)}
+                        {formatCurrency(item.price)}
                       </span>
                     </div>
                   </div>
@@ -743,7 +744,7 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
                   {/* Price */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                      Price (₹) <span className="text-red-500">*</span>
+                      Price ({getCurrencySymbol()}) <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"

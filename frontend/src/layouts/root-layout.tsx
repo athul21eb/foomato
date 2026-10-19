@@ -4,12 +4,16 @@ import { Navbar } from '../components/common/navbar';
 import { Footer } from '../components/common/footer';
 import { useTheme } from '../context/use-theme';
 import { useAuth } from '../context/use-auth';
+import { useCart } from '../features/cart/hooks/useCart';
 import { LoadingScreen } from '../components/feedback/loading-screen';
 
 export const RootLayout: React.FC = () => {
   const { theme } = useTheme();
   const { isAuthenticated, user, isLoading, isLoggingOut } = useAuth();
   const navigate = useNavigate();
+
+  // Automatically hydrates cart for authenticated customer
+  useCart();
 
   useEffect(() => {
     // Any authenticated user who has not chosen a role must stay on the role selection page

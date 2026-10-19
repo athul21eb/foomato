@@ -10,6 +10,8 @@ import {
 import { ClearCredentials, SetCheckingAuth } from '../slices/auth/authSlice';
 import { apiSlice } from '../app/api/auth/authenticationApiSlice';
 import { sellerApiSlice } from '../slices/seller/sellerApiSlice';
+import { cartApiSlice } from '../slices/cart/cartApiSlice';
+import { clearCart } from '../slices/cart/cartSlice';
 import { AuthContext } from './use-auth';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -59,9 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // 1. Immediately wipe local auth credentials synchronously to prevent any bounce/redirect glitch
       dispatch(ClearCredentials());
 
-      // 2. Clear RTK Query caches
+      // 2. Clear RTK Query caches & cart
       dispatch(apiSlice.util.resetApiState());
       dispatch(sellerApiSlice.util.resetApiState());
+      dispatch(cartApiSlice.util.resetApiState());
+      dispatch(clearCart());
 
       // 3. Tell backend to clear the httpOnly refreshToken cookie
       await logoutMutation().unwrap();

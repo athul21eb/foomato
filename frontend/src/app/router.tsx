@@ -15,6 +15,16 @@ const CustomerAccountPage = lazy(() =>
     default: m.CustomerAccountPage,
   })),
 );
+const AddressPage = lazy(() =>
+  import('../pages/customer/address-page').then((m) => ({
+    default: m.AddressPage,
+  })),
+);
+const CartPage = lazy(() =>
+  import('../pages/customer/cart-page').then((m) => ({
+    default: m.CartPage,
+  })),
+);
 const SellerDetailsPage = lazy(() =>
   import('../pages/customer/seller-details-page').then((m) => ({
     default: m.SellerDetailsPage,
@@ -52,8 +62,16 @@ export const router = createBrowserRouter([
         element: withSuspense(HomePage),
       },
       {
+        path: 'cart',
+        element: withSuspense(CartPage),
+      },
+      {
         path: 'account',
         element: withSuspense(CustomerAccountPage),
+      },
+      {
+        path: 'address',
+        element: withSuspense(AddressPage),
       },
       {
         path: 'restaurant/:id',

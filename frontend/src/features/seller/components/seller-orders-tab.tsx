@@ -11,6 +11,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '../../../lib/utils';
 
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'delivered';
 
@@ -301,7 +302,7 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({ seller }) => {
                           )}
                         </div>
                         <span className="font-bold text-zinc-700 dark:text-zinc-300">
-                          ₹{(it.price * it.quantity).toFixed(2)}
+                          {formatCurrency(it.price * it.quantity)}
                         </span>
                       </div>
                     ))}
@@ -320,7 +321,7 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({ seller }) => {
                       {order.paymentMethod}
                     </span>
                     <span className="text-base sm:text-lg font-black text-zinc-900 dark:text-white">
-                      ₹{order.totalAmount.toFixed(2)}
+                      {formatCurrency(order.totalAmount)}
                     </span>
                   </div>
                 </div>

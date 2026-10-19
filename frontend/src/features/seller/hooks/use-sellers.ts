@@ -9,7 +9,7 @@ import type { GetNearbySellersParams } from '../types/seller.types';
 export function useNearbySellers(
   params: Partial<GetNearbySellersParams> & { enabled?: boolean },
 ) {
-  const { latitude, longitude, radius = 5000, search = '', enabled = true } = params;
+  const { latitude, longitude, radius = 10000, search = '', enabled = true } = params;
 
   return useQuery({
     queryKey: ['sellers', 'nearby', { latitude, longitude, radius, search }],

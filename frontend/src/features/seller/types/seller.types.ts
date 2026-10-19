@@ -14,6 +14,8 @@ export interface Seller {
   isVerified: boolean;
   autoLocation: AutoLocation;
   isOpen: boolean;
+  distance?: number;
+  distanceKm?: number;
   createdAt?: string;
   updatedAt?: string;
 }

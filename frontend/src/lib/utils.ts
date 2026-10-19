@@ -35,3 +35,34 @@ export function getErrorMessage(error: unknown, fallback = 'Something went wrong
 
   return fallback;
 }
+
+/**
+ * Global Application Currency Configuration
+ * Default: Indian Rupee (₹)
+ */
+export const APP_CURRENCY = {
+  symbol: '₹',
+  code: 'INR',
+  locale: 'en-IN',
+} as const;
+
+/**
+ * Returns the current application currency symbol (default: '₹')
+ */
+export function getCurrencySymbol(): string {
+  return APP_CURRENCY.symbol;
+}
+
+/**
+ * Formats a numeric or string price with the application currency symbol.
+ * Handles decimals cleanly (e.g. formatCurrency(299) => "₹299.00" or "₹299")
+ */
+export function formatCurrency(
+  amount: number | string | null | undefined,
+  options?: { showDecimals?: boolean },
+): string {
+  const num = Number(amount) || 0;
+  const showDecimals = options?.showDecimals ?? true;
+  return `${APP_CURRENCY.symbol}${showDecimals ? num.toFixed(2) : Math.round(num)}`;
+}
+

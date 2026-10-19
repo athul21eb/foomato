@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Star, ShieldCheck } from 'lucide-react';
 import type { NearbySeller } from '../types/seller.types';
+import { formatDistance } from '../utils/seller.utils';
 
 interface SellerCardProps {
   seller: NearbySeller;
@@ -9,33 +10,10 @@ interface SellerCardProps {
 
 export const SellerCard: React.FC<SellerCardProps> = ({ seller }) => {
   const navigate = useNavigate();
-
-  // Format distance accurately with 1 decimal place, minimum 0.1 km if <= 0.1 km
-  const formatDistance = (
-    distKm?: number,
-    distMeters?: number,
-  ): string | null => {
-    let km: number | null = null;
-    if (distKm != null && !isNaN(Number(distKm))) {
-      km = Number(distKm);
-    } else if (distMeters != null && !isNaN(Number(distMeters))) {
-      km = Number(distMeters) / 1000;
-    }
-
-    if (km == null) return null;
-
-    // If between 0.0 and 0.1 km, display 0.1 km away
-    if (km <= 0.1) {
-      return '0.1 km';
-    }
-
-    return `${km.toFixed(1)} km`;
-  };
-
   const formattedDistance = formatDistance(seller.distanceKm, seller.distance);
 
   const handleClick = () => {
-    navigate(`/seller-store/${seller.id}`);
+    navigate(`/seller-store/${seller.id}`, { state: { seller } });
   };
 
   return (

@@ -30,13 +30,6 @@ export class MenuItemController {
     return this.menuItemService.addMenuItem(ownerId, createMenuItemDto);
   }
 
-  @Get('all/:id')
-  @UseGuards(AuthGuard)
-  @ResponseMessage('Menu items retrieved successfully')
-  async getAllItems(@Param('id') sellerId: string) {
-    return this.menuItemService.getAllItems(sellerId);
-  }
-
   @Delete(':itemId')
   @UseGuards(AuthGuard, SellerGuard)
   @ResponseMessage('Menu item deleted successfully')
@@ -61,5 +54,11 @@ export class MenuItemController {
       itemId,
       updateStatusDto,
     );
+  }
+  //-------------public routes -----------
+  @Get('all/:id')
+  @ResponseMessage('Menu items retrieved successfully')
+  async getAllItems(@Param('id') sellerId: string) {
+    return this.menuItemService.getAllItems(sellerId);
   }
 }

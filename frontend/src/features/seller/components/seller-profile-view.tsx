@@ -9,9 +9,12 @@ import {
   Star,
   CheckCircle,
   Share2,
+  Navigation,
+  ExternalLink,
 } from 'lucide-react';
 import { SellerStatusToggle } from './seller-status-toggle';
 import { toast } from 'sonner';
+import { formatDistance } from '../utils/seller.utils';
 
 interface SellerProfileViewProps {
   seller: Seller;
@@ -25,6 +28,21 @@ export const SellerProfileView: React.FC<SellerProfileViewProps> = ({
   onEditClick,
 }) => {
   const isOwner = mode === 'owner';
+  const formattedDistance = formatDistance(seller.distanceKm, seller.distance);
+
+  // Construct Google Maps URL (coordinates are [longitude, latitude])
+  const sellerCoords = seller.autoLocation?.coordinates;
+  const hasValidCoords =
+    Array.isArray(sellerCoords) &&
+    sellerCoords.length === 2 &&
+    typeof sellerCoords[0] === 'number' &&
+    typeof sellerCoords[1] === 'number';
+
+  const mapsUrl = hasValidCoords
+    ? `https://www.google.com/maps?q=${sellerCoords[1]},${sellerCoords[0]}`
+    : seller.autoLocation?.formattedAddress
+      ? `https://www.google.com/maps?q=${encodeURIComponent(seller.autoLocation.formattedAddress)}`
+      : null;
 
   const handleShare = () => {
     if (navigator.share) {
@@ -125,36 +143,89 @@ export const SellerProfileView: React.FC<SellerProfileViewProps> = ({
 
         {/* Profile Info Cards Bar */}
         <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-zinc-200/60 dark:border-zinc-800/60">
-          {/* Location & Address */}
-          <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50">
-            <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
-              <MapPin className="w-4 h-4" />
+          {/* Location & Address with Google Maps redirect */}
+          {mapsUrl ? (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open location in Google Maps"
+              className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50 hover:border-orange-500/40 hover:bg-orange-500/5 transition-all group cursor-pointer"
+            >
+              <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-500 group-hover:bg-orange-500 group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Location
+                  </span>
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-orange-500 group-hover:underline">
+                    <span>Maps</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                  {seller.autoLocation?.formattedAddress ||
+                    'No address registered'}
+                </p>
+              </div>
+            </a>
+          ) : (
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50">
+              <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Location
+                </span>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-2">
+                  {seller.autoLocation?.formattedAddress ||
+                    'No address registered'}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Location
-              </span>
-              <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-2">
-                {seller.autoLocation?.formattedAddress ||
-                  'No address registered'}
-              </p>
-            </div>
-          </div>
+          )}
 
-          {/* Phone & Support */}
-          <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-              <Phone className="w-4 h-4" />
+          {/* Middle Card: Distance (public) or Contact Phone (owner) */}
+          {!isOwner ? (
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                <Navigation className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Distance
+                </span>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                  {formattedDistance ? (
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                      {formattedDistance} away
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Nearby Kitchen
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Contact Phone
-              </span>
-              <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                {seller.phone || 'N/A'}
-              </p>
+          ) : (
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                <Phone className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Contact Phone
+                </span>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                  {seller.phone || 'N/A'}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Timing / Status */}
           <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50">

@@ -128,4 +128,11 @@ export class MenuItemService {
 
     return updated;
   }
+
+  async findById(itemId: string): Promise<MenuItemEntity | null> {
+    if (!Types.ObjectId.isValid(itemId)) {
+      return null;
+    }
+    return this.menuItemRepository.findById(itemId);
+  }
 }

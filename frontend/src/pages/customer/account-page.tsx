@@ -8,10 +8,7 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Plus,
-  Trash2,
   Shield,
-  Phone,
   Compass,
   ArrowRight,
   Receipt,
@@ -19,30 +16,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/use-auth';
 import { useTheme } from '../../context/use-theme';
-import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { fetchCurrentLocation } from '../../slices/location/locationSlice';
-import { LocationModal } from '../../components/ui/location-modal';
+import { useAppSelector } from '../../app/hooks';
 import { LoadingScreen } from '../../components/feedback/loading-screen';
 import { toast } from 'sonner';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  deliveryAddressSchema,
-  type DeliveryAddressFormValues,
-} from '../../features/customer/schemas/customer.schema';
-
-interface SavedAddress {
-  id: string;
-  tag: 'Home' | 'Work' | 'Other';
-  label: string;
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  phone: string;
-  isDefault: boolean;
-  notes?: string;
-}
+import { formatCurrency } from '../../lib/utils';
+import { AddressManager } from '../../features/customer/components/address-manager';
+import { useGetMyAddressesQuery } from '../../slices/address/addressApiSlice';
 
 interface OrderItemSummary {
   name: string;
@@ -64,32 +43,6 @@ interface CustomerOrder {
   estimatedDelivery?: string;
 }
 
-const INITIAL_ADDRESSES: SavedAddress[] = [
-  {
-    id: 'addr-1',
-    tag: 'Home',
-    label: 'Primary Residence',
-    street: 'Round South, Thrissur Town',
-    city: 'Thrissur',
-    state: 'Kerala',
-    zipCode: '680001',
-    phone: '+91 98470 12345',
-    isDefault: true,
-    notes: 'Near Swaraj Round. Ring bell at front gate.',
-  },
-  {
-    id: 'addr-2',
-    tag: 'Work',
-    label: 'Workplace Tech Park',
-    street: 'Infopark Phase 2, Kakkanad',
-    city: 'Kochi',
-    state: 'Kerala',
-    zipCode: '682030',
-    phone: '+91 98470 98765',
-    isDefault: false,
-    notes: 'Tower B, Reception Desk.',
-  },
-];
 
 const INITIAL_ORDERS: CustomerOrder[] = [
   {
@@ -149,51 +102,10 @@ export const CustomerAccountPage: React.FC = () => {
   const { user, isAuthenticated, isLoading: isAuthLoading, isLoggingOut, logout } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
   const locationState = useAppSelector((state) => state.location);
-
+  const { data: addresses = [] } = useGetMyAddressesQuery();
   const [activeTab, setActiveTab] = useState<AccountTab>('orders');
   const [orderFilter, setOrderFilter] = useState<'all' | 'in_progress' | 'delivered'>('all');
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  const [addresses, setAddresses] = useState<SavedAddress[]>(() => {
-    try {
-      const saved = localStorage.getItem('foomato_saved_addresses');
-      return saved ? JSON.parse(saved) : INITIAL_ADDRESSES;
-    } catch {
-      return INITIAL_ADDRESSES;
-    }
-  });
-
-  const [isAddingAddress, setIsAddingAddress] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm<DeliveryAddressFormValues>({
-    resolver: zodResolver(deliveryAddressSchema),
-    defaultValues: {
-      tag: 'Home',
-      label: 'Home Apartment',
-      street: '',
-      city: '',
-      state: 'Kerala',
-      zipCode: '',
-      phone: '',
-      notes: '',
-    },
-  });
-
-  // Sync addresses to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('foomato_saved_addresses', JSON.stringify(addresses));
-    } catch {
-      // Ignore storage write issues
-    }
-  }, [addresses]);
 
   // Auth Guard
   useEffect(() => {
@@ -202,66 +114,6 @@ export const CustomerAccountPage: React.FC = () => {
       navigate('/login', { replace: true });
     }
   }, [isAuthenticated, isAuthLoading, isLoggingOut, navigate]);
-
-  if (isLoggingOut) {
-    return (
-      <LoadingScreen
-        message="Signing out safely..."
-        subtext="Clearing your customer account session"
-      />
-    );
-  }
-
-  const handleSetDefaultAddress = (id: string) => {
-    setAddresses((prev) =>
-      prev.map((addr) => ({
-        ...addr,
-        isDefault: addr.id === id,
-      })),
-    );
-    toast.success('Default delivery address updated');
-  };
-
-  const handleDeleteAddress = (id: string) => {
-    setAddresses((prev) => prev.filter((addr) => addr.id !== id));
-    toast.success('Address removed from your profile');
-  };
-
-  const handleUseCurrentLocationForAddress = () => {
-    setIsLocationModalOpen(true);
-    if (locationState.status === 'idle' || locationState.status === 'failed' || locationState.status === 'denied') {
-      dispatch(fetchCurrentLocation());
-    }
-  };
-
-  const handleSaveNewAddress = (data: DeliveryAddressFormValues) => {
-    const created: SavedAddress = {
-      id: `addr-${crypto.randomUUID()}`,
-      tag: data.tag,
-      label: data.label.trim() || `${data.tag} Address`,
-      street: data.street.trim(),
-      city: data.city.trim(),
-      state: data.state.trim() || 'Kerala',
-      zipCode: data.zipCode?.trim() || '680001',
-      phone: data.phone?.trim() || '+91 98470 00000',
-      isDefault: addresses.length === 0,
-      notes: data.notes?.trim() || '',
-    };
-
-    setAddresses((prev) => [created, ...prev]);
-    setIsAddingAddress(false);
-    reset({
-      tag: 'Home',
-      label: 'Home Apartment',
-      street: '',
-      city: '',
-      state: 'Kerala',
-      zipCode: '',
-      phone: '',
-      notes: '',
-    });
-    toast.success('New delivery address saved!');
-  };
 
   const handlePerformLogout = async () => {
     try {
@@ -274,6 +126,15 @@ export const CustomerAccountPage: React.FC = () => {
       navigate('/login', { replace: true });
     }
   };
+
+  if (isLoggingOut) {
+    return (
+      <LoadingScreen
+        message="Signing out safely..."
+        subtext="Clearing your customer account session"
+      />
+    );
+  }
 
   const filteredOrders = INITIAL_ORDERS.filter((order) => {
     if (orderFilter === 'all') return true;
@@ -573,7 +434,7 @@ export const CustomerAccountPage: React.FC = () => {
                               {item.quantity}x {item.name}
                             </span>
                             <span className="font-bold text-orange-500 shrink-0">
-                              ${(item.price * item.quantity).toFixed(2)}
+                              {formatCurrency(item.price * item.quantity)}
                             </span>
                           </div>
                         ))}
@@ -611,7 +472,7 @@ export const CustomerAccountPage: React.FC = () => {
                             Total Paid
                           </span>
                           <span className="text-base font-extrabold text-orange-500">
-                            ${order.totalAmount.toFixed(2)}
+                            {formatCurrency(order.totalAmount)}
                           </span>
                         </div>
 
@@ -650,344 +511,9 @@ export const CustomerAccountPage: React.FC = () => {
 
         {/* TAB CONTENT: SAVED ADDRESSES */}
         {activeTab === 'addresses' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold">Delivery Addresses</h2>
-                <p className="text-xs opacity-60">
-                  Manage your home, workplace, and secondary food delivery points.
-                </p>
-              </div>
-
-              {!isAddingAddress && (
-                <button
-                  id="add-address-btn"
-                  onClick={() => setIsAddingAddress(true)}
-                  className="px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-md shadow-orange-500/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add New Address</span>
-                </button>
-              )}
-            </div>
-
-            {/* Expandable Add Address Form */}
-            {isAddingAddress && (
-              <form
-                noValidate
-                onSubmit={handleSubmit(handleSaveNewAddress)}
-                className={`p-6 rounded-2xl border shadow-xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 ${
-                  theme === 'dark'
-                    ? 'bg-zinc-900 border-zinc-700/80 shadow-black/50'
-                    : 'bg-white border-zinc-300 shadow-zinc-200'
-                }`}
-              >
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-500/10">
-                  <h3 className="font-bold text-base flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-orange-500" />
-                    <span>Add Delivery Location</span>
-                  </h3>
-
-                  <button
-                    type="button"
-                    onClick={handleUseCurrentLocationForAddress}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 transition-colors cursor-pointer"
-                  >
-                    <Compass className="w-3.5 h-3.5" />
-                    <span>Detect My Browser Location</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                      Address Tag
-                    </label>
-                    <select
-                      {...register('tag')}
-                      className={`w-full p-2.5 rounded-xl text-xs border outline-none font-medium transition-colors ${
-                        errors.tag
-                          ? 'border-red-500 bg-red-500/10'
-                          : theme === 'dark'
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-100 focus:border-orange-500'
-                          : 'bg-white border-zinc-300 text-zinc-900 focus:border-orange-500'
-                      }`}
-                    >
-                      <option value="Home">Home</option>
-                      <option value="Work">Work</option>
-                      <option value="Other">Other</option>
-                    </select>
-                    {errors.tag && (
-                      <p className="text-red-500 text-[11px] mt-1">{errors.tag.message}</p>
-                    )}
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                      Label / Nickname *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Swaraj Round Home or Infopark Desk"
-                      {...register('label')}
-                      className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                        errors.label
-                          ? 'border-red-500 bg-red-500/10'
-                          : theme === 'dark'
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
-                          : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
-                      }`}
-                    />
-                    {errors.label && (
-                      <p className="text-red-500 text-[11px] mt-1">{errors.label.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                      Street Address & Apt/Suite *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Round South, Near Ragam Theatre"
-                      {...register('street')}
-                      className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                        errors.street
-                          ? 'border-red-500 bg-red-500/10'
-                          : theme === 'dark'
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
-                          : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
-                      }`}
-                    />
-                    {errors.street && (
-                      <p className="text-red-500 text-[11px] mt-1">{errors.street.message}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Thrissur"
-                        {...register('city')}
-                        className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          errors.city
-                            ? 'border-red-500 bg-red-500/10'
-                            : theme === 'dark'
-                            ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
-                            : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
-                        }`}
-                      />
-                      {errors.city && (
-                        <p className="text-red-500 text-[11px] mt-1">{errors.city.message}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        State / Province *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Kerala"
-                        {...register('state')}
-                        className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          errors.state
-                            ? 'border-red-500 bg-red-500/10'
-                            : theme === 'dark'
-                            ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
-                            : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
-                        }`}
-                      />
-                      {errors.state && (
-                        <p className="text-red-500 text-[11px] mt-1">{errors.state.message}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 680001"
-                        {...register('zipCode')}
-                        className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          errors.zipCode
-                            ? 'border-red-500 bg-red-500/10'
-                            : theme === 'dark'
-                            ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
-                            : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
-                        }`}
-                      />
-                      {errors.zipCode && (
-                        <p className="text-red-500 text-[11px] mt-1">{errors.zipCode.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        Phone Contact
-                      </label>
-                      <input
-                        type="tel"
-                        placeholder="+91 98470 00000"
-                        {...register('phone')}
-                        className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          errors.phone
-                            ? 'border-red-500 bg-red-500/10'
-                            : theme === 'dark'
-                            ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
-                            : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
-                        }`}
-                      />
-                      {errors.phone && (
-                        <p className="text-red-500 text-[11px] mt-1">{errors.phone.message}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        Delivery Gate/Door Instructions
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Buzz doorbell, leave at doorstep"
-                        {...register('notes')}
-                        className={`w-full p-2.5 rounded-xl text-xs border outline-none transition-colors ${
-                          errors.notes
-                            ? 'border-red-500 bg-red-500/10'
-                            : theme === 'dark'
-                            ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:border-orange-500'
-                            : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500'
-                        }`}
-                      />
-                      {errors.notes && (
-                        <p className="text-red-500 text-[11px] mt-1">{errors.notes.message}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-500/10">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingAddress(false);
-                      reset();
-                    }}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-                      theme === 'dark'
-                        ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
-                        : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100'
-                    }`}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-md shadow-orange-500/20 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                  >
-                    Save Address
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Saved Addresses List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {addresses.map((addr) => (
-                <div
-                  key={addr.id}
-                  className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    addr.isDefault
-                      ? 'border-orange-500/60 ring-2 ring-orange-500/20'
-                      : theme === 'dark'
-                      ? 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700'
-                      : 'bg-white border-zinc-200 hover:border-zinc-300'
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${
-                            addr.tag === 'Home'
-                              ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
-                              : addr.tag === 'Work'
-                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                              : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
-                          }`}
-                        >
-                          {addr.tag}
-                        </span>
-                        <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{addr.label}</h4>
-                      </div>
-
-                      {addr.isDefault && (
-                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Default
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-xs space-y-1 text-zinc-600 dark:text-zinc-400">
-                      <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                        {addr.street}
-                      </p>
-                      <p>
-                        {addr.city}, {addr.state} {addr.zipCode}
-                      </p>
-                      {addr.phone && (
-                        <p className="flex items-center gap-1.5 pt-1 text-zinc-700 dark:text-zinc-300">
-                          <Phone className="w-3 h-3 text-orange-500" />
-                          <span>{addr.phone}</span>
-                        </p>
-                      )}
-                      {addr.notes && (
-                        <p className="text-[11px] italic text-zinc-500 dark:text-zinc-400 pt-1">
-                          Note: "{addr.notes}"
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-zinc-500/10">
-                    {!addr.isDefault ? (
-                      <button
-                        onClick={() => handleSetDefaultAddress(addr.id)}
-                        className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
-                      >
-                        Set as Default
-                      </button>
-                    ) : (
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Primary Destination</span>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleDeleteAddress(addr.id)}
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                        title="Remove address"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <AddressManager showHeader={true} />
         )}
+
 
         {/* TAB CONTENT: LOGOUT TAB */}
         {activeTab === 'logout' && (
@@ -1058,19 +584,7 @@ export const CustomerAccountPage: React.FC = () => {
         )}
       </div>
 
-      {/* Location Details Popup Modal */}
-      <LocationModal
-        isOpen={isLocationModalOpen}
-        onClose={() => setIsLocationModalOpen(false)}
-        confirmButtonText="Use For Address Form"
-        onConfirm={(loc) => {
-          if (loc.address) setValue('street', loc.address, { shouldValidate: true });
-          if (loc.city) setValue('city', loc.city, { shouldValidate: true });
-          if (loc.state) setValue('state', loc.state, { shouldValidate: true });
-          if (loc.zipCode) setValue('zipCode', loc.zipCode, { shouldValidate: true });
-          toast.success('Address auto-filled from detected location!');
-        }}
-      />
+
     </div>
   );
 };
