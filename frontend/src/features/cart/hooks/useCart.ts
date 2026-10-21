@@ -222,7 +222,6 @@ export const useCart = () => {
         toast.error(errMessage);
         setConflictModalOpen(false);
         setPendingItem(null);
-        return;
       }
     }
 

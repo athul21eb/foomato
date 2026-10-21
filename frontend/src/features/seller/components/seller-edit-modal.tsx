@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Seller } from '../types/seller.types';
+import { useModalScrollLock } from '../../../lib/use-modal-scroll-lock';
 import {
   useUpdateSellerMutation,
   useUploadImageMutation,
@@ -63,7 +65,7 @@ export const SellerEditModal: React.FC<SellerEditModalProps> = ({
     },
   });
 
-
+  useModalScrollLock(isOpen);
 
   if (!isOpen) return null;
 
@@ -178,7 +180,7 @@ export const SellerEditModal: React.FC<SellerEditModalProps> = ({
 
   const isSubmitting = isUploading || isUpdating;
 
-  return (
+  return createPortal(
     <>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
@@ -444,6 +446,7 @@ export const SellerEditModal: React.FC<SellerEditModalProps> = ({
           confirmButtonText="Update Store Location"
         />
       )}
-    </>
+    </>,
+    document.body
   );
 };

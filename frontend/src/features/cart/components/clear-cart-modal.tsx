@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Trash2, X, AlertCircle, Loader2 } from 'lucide-react';
+import { useModalScrollLock } from '../../../lib/use-modal-scroll-lock';
 
 interface ClearCartModalProps {
   isOpen: boolean;
@@ -28,9 +30,11 @@ export const ClearCartModal: React.FC<ClearCartModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onCancel, isClearing]);
 
+  useModalScrollLock(isOpen);
+
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={() => {
@@ -117,7 +121,8 @@ export const ClearCartModal: React.FC<ClearCartModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

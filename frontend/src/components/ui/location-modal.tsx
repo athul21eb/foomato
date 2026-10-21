@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   MapPin,
   Compass,
@@ -21,6 +22,7 @@ import {
   fetchCurrentLocation,
   setManualLocation,
 } from '../../slices/location/locationSlice';
+import { useModalScrollLock } from '../../lib/use-modal-scroll-lock';
 import {
   loadGoogleMaps,
   isGoogleMapsReady,
@@ -327,6 +329,8 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     mapInstanceRef.current.panTo({ lat: latitude, lng: longitude });
     updateMarkerPosition(latitude, longitude);
   }, [isOpen, locationState.coords, updateMarkerPosition]);
+
+  useModalScrollLock(isOpen);
 
   if (!isOpen) return null;
 
@@ -748,9 +752,9 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   const isFailed = locationState.status === 'failed';
   const hasCoordinates = !!locationState.coords;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -1105,7 +1109,8 @@ export const LocationModal: React.FC<LocationModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

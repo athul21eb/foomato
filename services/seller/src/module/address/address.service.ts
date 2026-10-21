@@ -43,6 +43,24 @@ export class AddressService {
     return this.addressRepository.findByUserId(userId);
   }
 
+  async findById(id: string): Promise<AddressEntity | null> {
+    if (!Types.ObjectId.isValid(id)) {
+      return null;
+    }
+    return this.addressRepository.findById(id);
+  }
+
+  async findByIdAndUserId(
+    id: string,
+    userId: string,
+  ): Promise<AddressEntity | null> {
+    const address = await this.findById(id);
+    if (!address || address.userId !== userId) {
+      return null;
+    }
+    return address;
+  }
+
   async updateAddress(
     userId: string,
     id: string,

@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Seller } from '../types/seller.types';
+import { useModalScrollLock } from '../../../lib/use-modal-scroll-lock';
 import {
   UtensilsCrossed,
   Plus,
@@ -225,6 +227,8 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
       setCurrentPage(newPage);
     }
   };
+
+  useModalScrollLock(Boolean(itemToDelete || isAddModalOpen));
 
   return (
     <div className="space-y-6">
@@ -521,7 +525,7 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {itemToDelete && (
+      {itemToDelete && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setItemToDelete(null)}
@@ -575,11 +579,12 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Add New Dish Modal — 2 Columns on md+ screens, compact and zero-scroll design */}
-      {isAddModalOpen && (
+      {isAddModalOpen && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
           onClick={handleCloseModal}
@@ -816,7 +821,8 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -1,6 +1,8 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, ArrowRight } from 'lucide-react';
 import type { CartItemInput } from '../hooks/useCart';
+import { useModalScrollLock } from '../../../lib/use-modal-scroll-lock';
 
 interface RestaurantConflictModalProps {
   isOpen: boolean;
@@ -17,9 +19,11 @@ export const RestaurantConflictModal: React.FC<RestaurantConflictModalProps> = (
   onConfirm,
   onCancel,
 }) => {
+  useModalScrollLock(isOpen);
+
   if (!isOpen || !pendingItem) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="w-full max-w-md rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-200">
         <div className="flex items-center gap-3">
@@ -77,6 +81,7 @@ export const RestaurantConflictModal: React.FC<RestaurantConflictModalProps> = (
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

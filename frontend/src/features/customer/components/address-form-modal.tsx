@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -17,6 +18,7 @@ import {
   type CustomerAddressFormValues,
 } from '../schemas/customer.schema';
 import type { CustomerAddress } from '../types/address.types';
+import { useModalScrollLock } from '../../../lib/use-modal-scroll-lock';
 
 interface AddressFormModalProps {
   isOpen: boolean;
@@ -93,6 +95,8 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, isSubmitting, isMapModalOpen]);
 
+  useModalScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   const handleLocationConfirm = (locationData: {
@@ -120,7 +124,7 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     setIsMapModalOpen(false);
   };
 
-  return (
+  return createPortal(
     <>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
@@ -331,6 +335,7 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
         onConfirm={handleLocationConfirm}
         confirmButtonText="Confirm Delivery Location"
       />
-    </>
+    </>,
+    document.body
   );
 };

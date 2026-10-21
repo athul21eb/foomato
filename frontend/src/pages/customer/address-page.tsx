@@ -63,7 +63,7 @@ export const AddressPage: React.FC = () => {
         </div>
 
         {/* Address Manager Container */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 shadow-sm backdrop-blur-xs">
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
           <AddressManager showHeader={true} />
         </div>
       </div>

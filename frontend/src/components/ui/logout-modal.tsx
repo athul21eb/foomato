@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { LogOut, X, AlertTriangle, Shield, User as UserIcon } from 'lucide-react';
 import { useTheme } from '../../context/use-theme';
 import { useAuth } from '../../context/use-auth';
+import { useModalScrollLock } from '../../lib/use-modal-scroll-lock';
 
 interface LogoutModalProps {
   isOpen: boolean;
@@ -30,6 +32,8 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  useModalScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   const roleLabel =
@@ -41,7 +45,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
       ? 'Customer'
       : 'User';
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
@@ -159,7 +163,8 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

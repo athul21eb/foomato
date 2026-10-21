@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Trash2, X, AlertCircle, Loader2 } from 'lucide-react';
 import type { CustomerAddress } from '../types/address.types';
+import { useModalScrollLock } from '../../../lib/use-modal-scroll-lock';
 
 interface DeleteAddressModalProps {
   isOpen: boolean;
@@ -27,9 +29,11 @@ export const DeleteAddressModal: React.FC<DeleteAddressModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onCancel, isDeleting]);
 
+  useModalScrollLock(isOpen);
+
   if (!isOpen || !address) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={() => {
@@ -113,6 +117,7 @@ export const DeleteAddressModal: React.FC<DeleteAddressModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
