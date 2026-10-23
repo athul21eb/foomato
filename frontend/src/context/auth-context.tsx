@@ -1,18 +1,18 @@
-import React, { useEffect } from 'react';
-import type { AuthUser, Role } from '../features/auth/types/auth.types';
-import { useAppDispatch, useAppSelector } from '../app/hooks';
+import React, { useEffect } from "react";
+import type { AuthUser, Role } from "../features/auth/types/auth.types";
+import { useAppDispatch, useAppSelector } from "../app/hooks";
 import {
   useGoogleSignInMutation,
   useUpdateRoleMutation,
   useTokenRefreshMutation,
   useLogoutMutation,
-} from '../slices/auth/authApiSlice';
-import { ClearCredentials, SetCheckingAuth } from '../slices/auth/authSlice';
-import { apiSlice } from '../app/api/auth/authenticationApiSlice';
-import { sellerApiSlice } from '../slices/seller/sellerApiSlice';
-import { cartApiSlice } from '../slices/cart/cartApiSlice';
-import { clearCart } from '../slices/cart/cartSlice';
-import { AuthContext } from './use-auth';
+} from "../slices/auth/authApiSlice";
+import { ClearCredentials, SetCheckingAuth } from "../slices/auth/authSlice";
+import { apiSlice } from "../app/api/auth/authenticationApiSlice";
+import { sellerApiSlice } from "../slices/seller/sellerApiSlice";
+import { cartApiSlice } from "../slices/cart/cartApiSlice";
+import { clearCart } from "../slices/cart/cartSlice";
+import { AuthContext } from "./use-auth";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,

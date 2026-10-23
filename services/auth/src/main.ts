@@ -4,10 +4,19 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import {
+  AppLoggerService,
+  registerProcessWarningLogger,
+} from './common/logger';
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const logger = new AppLoggerService('Bootstrap');
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+  app.useLogger(logger);
+  registerProcessWarningLogger();
 
   app.enableCors({
     origin: true,
@@ -31,7 +40,10 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new TransformInterceptor(app.get(Reflector)),
+  );
 
   const configService = app.get(ConfigService);
   const port = configService.getOrThrow<number>('PORT');

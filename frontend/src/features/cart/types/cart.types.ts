@@ -10,6 +10,7 @@ export interface PopulatedCartItem {
     price: number;
     image: string;
     isVeg: boolean;
+    isAvailable?: boolean;
     description?: string;
   };
   seller?: {

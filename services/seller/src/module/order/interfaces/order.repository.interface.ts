@@ -11,9 +11,29 @@ export interface IOrderRepository {
   findById(id: string): Promise<OrderEntity | null>;
   findByUserId(userId: string): Promise<OrderEntity[]>;
   findByRestaurantId(restaurantId: string): Promise<OrderEntity[]>;
-  updateStatus(id: string, status: OrderStatus): Promise<OrderEntity | null>;
+  updateStatus(
+    id: string,
+    status: OrderStatus,
+    reason?: string,
+  ): Promise<OrderEntity | null>;
+
   updatePaymentStatus(
     id: string,
     paymentStatus: PaymentStatus,
   ): Promise<OrderEntity | null>;
+  findActivePendingByUserId(userId: string): Promise<OrderEntity | null>;
+  updatePaymentMethod(
+    id: string,
+    paymentMethod: string,
+  ): Promise<OrderEntity | null>;
+  findSellerOrders(
+    restaurantId: string,
+    page: number,
+    limit: number,
+    status?: OrderStatus,
+  ): Promise<{
+    orders: OrderEntity[];
+    total: number;
+    counts?: Record<string, number>;
+  }>;
 }

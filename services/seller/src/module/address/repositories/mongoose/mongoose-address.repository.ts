@@ -109,7 +109,7 @@ export class MongooseAddressRepository implements IAddressRepository {
           userId: userObjId,
         },
         { $set: updatePayload },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .exec();
 
@@ -137,7 +137,7 @@ export class MongooseAddressRepository implements IAddressRepository {
       .findOneAndUpdate(
         { _id: targetId, userId: userObjId },
         { $set: { isDefault: true } },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .exec();
 

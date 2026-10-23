@@ -18,7 +18,7 @@ import { SellerGuard } from '../../common/guards/seller.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 
-@Controller(['seller'])
+@Controller('seller')
 export class SellerController {
   constructor(private readonly sellerService: SellerService) {}
 
@@ -61,7 +61,7 @@ export class SellerController {
 
   // --- Public Routes ---
 
-  @Get(['nearby'])
+  @Get('nearby')
   @ResponseMessage('Nearby restaurants retrieved successfully')
   async getNearbyRestaurant(@Query() query: GetNearbySellersDto) {
     return this.sellerService.getNearbyRestaurants(query);

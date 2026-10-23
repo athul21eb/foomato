@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CloudinaryService } from '../../lib/cloudinary/cloudinary.service';
 import { getBuffer } from '../../common/utils/get-buffer.util';
 import { UploadImageDto } from './dto/upload-image.dto';
@@ -14,6 +14,8 @@ export interface UploadResult {
 
 @Injectable()
 export class UploadService {
+  private readonly logger = new Logger(UploadService.name);
+
   constructor(private readonly cloudinaryService: CloudinaryService) {}
 
   async handleUpload(
@@ -36,6 +38,10 @@ export class UploadService {
         folder,
       );
 
+      this.logger.log(
+        `File upload succeeded in folder "${folder}": ${result.secure_url} (${result.public_id})`,
+      );
+
       return {
         url: result.secure_url,
         publicId: result.public_id,
@@ -55,6 +61,10 @@ export class UploadService {
       const result = await this.cloudinaryService.uploadDataUri(
         dataUriString,
         folder,
+      );
+
+      this.logger.log(
+        `Buffer upload succeeded in folder "${folder}": ${result.secure_url} (${result.public_id})`,
       );
 
       return {

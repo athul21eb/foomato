@@ -23,8 +23,8 @@ export const authApiSlice = apiSlice.injectEndpoints({
           const res = await queryFulfilled;
           const { user, accessToken } = res.data;
           dispatch(SetCredentials({ user, accessToken }));
-        } catch (error) {
-          console.error('Error in googleSignIn:', error);
+        } catch {
+          // Handled by component mutation trigger
         }
       },
       invalidatesTags: ['User'],
@@ -42,8 +42,8 @@ export const authApiSlice = apiSlice.injectEndpoints({
           const res = await queryFulfilled;
           const { user, accessToken } = res.data;
           dispatch(SetCredentials({ user, accessToken }));
-        } catch (error) {
-          console.error('Error in updateRole:', error);
+        } catch {
+          // Handled by component mutation trigger
         }
       },
       invalidatesTags: ['User'],

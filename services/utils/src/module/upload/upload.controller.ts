@@ -23,14 +23,4 @@ export class UploadController {
   ) {
     return this.uploadService.handleUpload(file, dto);
   }
-
-  @Post('image')
-  @UseInterceptors(FileInterceptor('image'))
-  @ResponseMessage('Image uploaded successfully')
-  async uploadImageField(
-    @UploadedFile() file?: Express.Multer.File,
-    @Body() dto?: UploadImageDto,
-  ) {
-    return this.uploadService.handleUpload(file, dto);
-  }
 }

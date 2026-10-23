@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package realtime;
+
+service RealtimeService {
+  rpc EmitToRoom (EmitToRoomRequest) returns (EmitResponse);
+  rpc EmitToUser (EmitToUserRequest) returns (EmitResponse);
+  rpc EmitToSeller (EmitToSellerRequest) returns (EmitResponse);
+}
+
+message EmitToRoomRequest {
+  string room = 1;
+  string event = 2;
+  string payload_json = 3;
+}
+
+message EmitToUserRequest {
+  string user_id = 1;
+  string event = 2;
+  string payload_json = 3;
+}
+
+message EmitToSellerRequest {
+  string seller_id = 1;
+  string event = 2;
+  string payload_json = 3;
+}
+
+message EmitResponse {
+  bool success = 1;
+}

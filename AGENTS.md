@@ -60,6 +60,8 @@ frontend/src/
 └── types/ # Global cross-cutting TypeScript definitions
 └── api.ts # Standard ApiResponse<T> interface
 
+- **Animation Standard**: Never use raw `motion.div` directly in pages or feature components. Always derive and encapsulate reusable, semantic animation wrappers in `frontend/src/lib/animations.tsx` (e.g., `FadeInUp`, `ScaleIn`, `StaggerContainer`, `AnimatedOrderList`, `AnimatedOrderCard`) and import them from there.
+
 ---Backend
 
 src/
@@ -94,7 +96,17 @@ src/
 - Mark infrastructure modules @Global() and import once in AppModule
 - Feature modules go in src/module/<name>/
 - Shared guards, interceptors, decorators go in src/common/
+- Always use this.configService.getOrThrow<Type>('VAR_NAME') instead of configService.get() to fail fast if required configuration is missing
 - Use Nest CLI: nest g module / nest g service / nest g controller
+- **Logging Standards (Industrial)**:
+  - Never use raw `console.log` or leak sensitive data (JWT tokens, passwords, secrets, cookies).
+  - Always type catch blocks as `catch (error: unknown)` and narrow using `instanceof Error` to safely access `.message` and `.stack`.
+  - Every controller, service, and consumer must declare `private readonly logger = new Logger(ClassName.name);`.
+  - Log key business lifecycle events (entity creation, payment verification, order state changes, role updates) with entity IDs.
+  - Microservices must use `AppLoggerService` (`src/common/logger/app-logger.service.ts`), `LoggingInterceptor`, and `RequestContext` (`AsyncLocalStorage`) so `x-correlation-id` is automatically propagated and attached to all logs.
+- **Single Canonical Route Rule (Industrial API Design)**:
+  - Never use array route paths (e.g. `@Controller(['order', 'orders'])`, `@Post(['', 'new'])`, `@Post(['razorpay/order', 'razorpay/create-order'])`).
+  - Every endpoint must have exactly one single, unambiguous, canonical RESTful route path per handler. This guarantees clean Swagger documentation, precise metric aggregation, and prevents rate-limit bypasses.
 
 ## Skills
 

@@ -14,6 +14,7 @@ export class CartItemEntity {
     price: number;
     image: string;
     isVeg: boolean;
+    isAvailable?: boolean;
     description?: string;
   };
   seller?: {

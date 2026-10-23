@@ -25,6 +25,21 @@ const CartPage = lazy(() =>
     default: m.CartPage,
   })),
 );
+const CheckoutPage = lazy(() =>
+  import('../pages/customer/checkout-page').then((m) => ({
+    default: m.CheckoutPage,
+  })),
+);
+const OrderSuccessPage = lazy(() =>
+  import('../pages/customer/order-success-page').then((m) => ({
+    default: m.OrderSuccessPage,
+  })),
+);
+const PaymentFailedPage = lazy(() =>
+  import('../pages/customer/payment-failed-page').then((m) => ({
+    default: m.PaymentFailedPage,
+  })),
+);
 const SellerDetailsPage = lazy(() =>
   import('../pages/customer/seller-details-page').then((m) => ({
     default: m.SellerDetailsPage,
@@ -64,6 +79,26 @@ export const router = createBrowserRouter([
       {
         path: 'cart',
         element: withSuspense(CartPage),
+      },
+      {
+        path: 'checkout',
+        element: withSuspense(CheckoutPage),
+      },
+      {
+        path: 'order-success/:orderId',
+        element: withSuspense(OrderSuccessPage),
+      },
+      {
+        path: 'ordersuccess',
+        element: withSuspense(OrderSuccessPage),
+      },
+      {
+        path: 'payment-failed/:orderId',
+        element: withSuspense(PaymentFailedPage),
+      },
+      {
+        path: 'payment-failed',
+        element: withSuspense(PaymentFailedPage),
       },
       {
         path: 'account',

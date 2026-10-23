@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Post,
   Put,
   Res,
@@ -25,6 +26,8 @@ import { AuthGuard } from '../../common/guards/auth.guard';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   private setRefreshTokenCookie(res: Response, token: string) {
@@ -46,6 +49,7 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto);
     this.setRefreshTokenCookie(res, result.refreshToken);
+    this.logger.log(`User logged in via email: ${loginDto.email}`);
     return {
       user: result.user,
       accessToken: result.accessToken,
@@ -61,7 +65,9 @@ export class AuthController {
   ) {
     const result = await this.authService.googleLogin(googleLoginDto);
     this.setRefreshTokenCookie(res, result.refreshToken);
-    console.log(result.accessToken, '=========access=========');
+    this.logger.log(
+      `Google login successful for user: ${result.user.email} (${result.user.id})`,
+    );
     return {
       user: result.user,
       accessToken: result.accessToken,
@@ -79,13 +85,16 @@ export class AuthController {
   ) {
     const result = await this.authService.updateRole(userId, updateRoleDto);
     this.setRefreshTokenCookie(res, result.refreshToken);
+    this.logger.log(
+      `User ${userId} updated role to "${updateRoleDto.role}" successfully`,
+    );
     return {
       user: result.user,
       accessToken: result.accessToken,
     };
   }
 
-  @Post(['token-refresh', 'refresh-token'])
+  @Post('token-refresh')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Access token refreshed successfully')
   async refreshToken(
@@ -93,11 +102,13 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (!token) {
+      this.logger.warn('Token refresh attempted without refreshToken cookie');
       throw new UnauthorizedException('Refresh token is missing');
     }
 
     const result = await this.authService.refreshTokens(token);
     this.setRefreshTokenCookie(res, result.refreshToken);
+    this.logger.log(`Access token refreshed for user: ${result.user.id}`);
     return {
       user: result.user,
       accessToken: result.accessToken,
@@ -114,6 +125,7 @@ export class AuthController {
       path: '/',
       secure: process.env.NODE_ENV === 'production',
     });
+    this.logger.log('User logged out successfully');
     return { success: true };
   }
 

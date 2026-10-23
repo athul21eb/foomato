@@ -51,10 +51,7 @@ export class RabbitmqService implements OnModuleInit, OnApplicationShutdown {
    * Connect to RabbitMQ broker and initialize channel with retry logic
    */
   private async connectWithRetry(retries = 5, delayMs = 3000): Promise<void> {
-    const rabbitmqUrl = this.configService.get<string>(
-      'RABBITMQ_URL',
-      'amqp://admin:admin123@localhost:5672',
-    );
+    const rabbitmqUrl = this.configService.getOrThrow<string>('RABBITMQ_URL');
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       if (this.isShuttingDown) return;
@@ -93,10 +90,8 @@ export class RabbitmqService implements OnModuleInit, OnApplicationShutdown {
         this.channel = channel;
 
         // Assert standard queues configured in environment
-        const paymentQueue = this.configService.get<string>(
-          'PAYMENT_QUEUE',
-          'payment_queue',
-        );
+        const paymentQueue =
+          this.configService.getOrThrow<string>('PAYMENT_QUEUE');
         await this.assertQueue(paymentQueue, { durable: true });
 
         this.logger.log(

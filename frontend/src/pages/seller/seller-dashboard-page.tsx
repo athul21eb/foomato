@@ -5,6 +5,7 @@ import { SellerProfileView } from "../../features/seller/components/seller-profi
 import { SellerEditModal } from "../../features/seller/components/seller-edit-modal";
 import { SellerMenuTab } from "../../features/seller/components/seller-menu-tab";
 import { SellerOrdersTab } from "../../features/seller/components/seller-orders-tab";
+import { useSellerSocket } from "../../features/seller/hooks/use-seller-socket";
 import {
   Store,
   PlusCircle,
@@ -23,8 +24,13 @@ export type SellerDashboardTab = 'profile' | 'menu' | 'orders';
 export const SellerDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: seller, isLoading, isError, error } = useGetMySellerQuery();
-  const [activeTab, setActiveTab] = useState<SellerDashboardTab>('profile');
+  const [activeTab, setActiveTab] = useState<SellerDashboardTab>('orders');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Initialize Realtime WebSocket & Audio Chimes at dashboard level so alerts are never missed
+  const socketProps = useSellerSocket({
+    sellerId: seller?.id,
+  });
 
   // Check if seller profile is not created (404 status from backend)
   const isNotFound =
@@ -70,7 +76,7 @@ export const SellerDashboardPage: React.FC = () => {
           <button
             onClick={() => navigate("/seller/new")}
             type="button"
-            className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 text-white font-bold text-base shadow-xl shadow-orange-500/25 hover:brightness-110 active:scale-98 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl bg-linear-to-r from-orange-500 via-amber-500 to-red-500 text-white font-bold text-base shadow-xl shadow-orange-500/25 hover:brightness-110 active:scale-98 transition-all cursor-pointer"
           >
             <PlusCircle className="w-5 h-5" />
             <span>Create Restaurant Profile</span>
@@ -151,18 +157,24 @@ export const SellerDashboardPage: React.FC = () => {
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isSelected = activeTab === tab.id;
+            const isOrders = tab.id === 'orders';
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none relative ${
                   isSelected
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/25'
+                    ? 'bg-linear-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/25'
                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <div className="relative flex items-center justify-center">
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {isOrders && socketProps.isConnected && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  )}
+                </div>
                 <span className="truncate">{tab.mobileLabel}</span>
               </button>
             );
@@ -204,6 +216,7 @@ export const SellerDashboardPage: React.FC = () => {
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isSelected = activeTab === tab.id;
+            const isOrders = tab.id === 'orders';
             return (
               <button
                 key={tab.id}
@@ -211,18 +224,21 @@ export const SellerDashboardPage: React.FC = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`w-full p-3 rounded-2xl text-left transition-all flex items-center gap-3 cursor-pointer group ${
                   isSelected
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20 font-bold'
+                    ? 'bg-linear-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20 font-bold'
                     : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 font-medium'
                 }`}
               >
                 <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors relative ${
                     isSelected
                       ? 'bg-white/20 text-white'
                       : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 group-hover:text-orange-500'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
+                  {isOrders && socketProps.isConnected && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse ring-2 ring-white dark:ring-zinc-900" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-xs block leading-tight truncate">
@@ -265,9 +281,9 @@ export const SellerDashboardPage: React.FC = () => {
         </div>
       </aside>
 
-      {/* RIGHT COLUMN: Centered within right area, independently scrollable */}
-      <main className="flex-1 min-w-0 md:h-full md:overflow-y-auto custom-scrollbar pr-0 md:pr-2 flex flex-col items-center">
-        <div className="w-full max-w-4xl space-y-8 pb-12">
+      {/* RIGHT COLUMN: Centered with stable scroll gutters & symmetric padding */}
+      <main className="flex-1 min-w-0 md:h-full md:overflow-y-auto custom-scrollbar px-1.5 sm:px-3 md:px-5 lg:px-6 pb-8 pt-0.5">
+        <div className="w-full max-w-4xl mx-auto space-y-4">
           {activeTab === 'profile' && (
             <div className="space-y-8 animate-in fade-in duration-200">
               {/* Reusable Seller Profile Component */}
@@ -343,7 +359,7 @@ export const SellerDashboardPage: React.FC = () => {
 
           {activeTab === 'orders' && (
             <div className="animate-in fade-in duration-200">
-              <SellerOrdersTab seller={seller} />
+              <SellerOrdersTab seller={seller} socketProps={socketProps} />
             </div>
           )}
         </div>

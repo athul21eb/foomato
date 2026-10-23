@@ -41,6 +41,7 @@ export interface DeliveryAddressInfo {
 
 export class OrderEntity {
   id: string;
+  orderNumber?: string;
   userId: string;
   restaurantId: string;
   restaurantName: string;
@@ -52,22 +53,19 @@ export class OrderEntity {
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
-  platfromFee: number;
-  platformFee?: number;
+  platformFee: number;
   totalAmount: number;
   addressId: string;
   deliveryAddress: DeliveryAddressInfo;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  reason?: string;
   expiresAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 
   constructor(partial?: Partial<OrderEntity>) {
     Object.assign(this, partial);
-    if (this.platfromFee !== undefined && this.platformFee === undefined) {
-      this.platformFee = this.platfromFee;
-    }
   }
 }

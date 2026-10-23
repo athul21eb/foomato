@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package order;
+
+service OrderService {
+  rpc GetOrderForPayment (GetOrderForPaymentRequest) returns (GetOrderForPaymentResponse);
+}
+
+message GetOrderForPaymentRequest {
+  string order_id = 1;
+}
+
+message GetOrderForPaymentResponse {
+  string order_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string payment_status = 4;
+}

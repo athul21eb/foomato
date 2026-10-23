@@ -29,6 +29,7 @@ import { LoadingScreen } from "../components/feedback/loading-screen";
 import { useNearbySellers } from "../features/seller/hooks/use-sellers";
 import { SellerCard } from "../features/seller/components/seller-card";
 import { useDebounce } from "../lib/use-debounce";
+import { CardRevealStagger, CardRevealItem, FadeInUp } from "../lib/animations";
 
 export const HomePage: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -82,14 +83,12 @@ export const HomePage: React.FC = () => {
   };
 
   // TanStack Query for live nearby restaurants based on GPS location & debounced search
-  const {
-    data: nearbyData,
-    isLoading: isRestaurantsLoading,
-  } = useNearbySellers({
-    latitude: locationState.coords?.latitude,
-    longitude: locationState.coords?.longitude,
-    search: activeSearchQuery,
-  });
+  const { data: nearbyData, isLoading: isRestaurantsLoading } =
+    useNearbySellers({
+      latitude: locationState.coords?.latitude,
+      longitude: locationState.coords?.longitude,
+      search: activeSearchQuery,
+    });
 
   const liveRestaurants = nearbyData?.restaurants || [];
 
@@ -142,26 +141,28 @@ export const HomePage: React.FC = () => {
       {/* 1. HERO SECTION */}
       <section className="relative pt-12 sm:pt-20 pb-20 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
-          {/* Pill Announcement */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold mb-6 backdrop-blur-md border border-orange-500/20 bg-orange-500/10 text-orange-500 animate-in fade-in slide-in-from-top-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Next-Generation Multi-Tenant Food Delivery Engine</span>
-          </div>
+          <FadeInUp initialY={16} duration={0.4}>
+            {/* Pill Announcement */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold mb-6 backdrop-blur-md border border-orange-500/20 bg-orange-500/10 text-orange-500">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Next-Generation Multi-Tenant Food Delivery Engine</span>
+            </div>
 
-          {/* Hero Title */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight max-w-4xl leading-[1.08] mb-6">
-            Craving Flavor?{" "}
-            <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 bg-clip-text text-transparent">
-              Foomato
-            </span>{" "}
-            Delivers Instantly.
-          </h1>
+            {/* Hero Title */}
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight max-w-4xl leading-[1.08] mb-6">
+              Craving Flavor?{" "}
+              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 bg-clip-text text-transparent">
+                Foomato
+              </span>{" "}
+              Delivers Instantly.
+            </h1>
 
-          {/* Subtitle */}
-          <p className="text-base sm:text-xl max-w-2xl text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed">
-            From sizzling local street eats to Michelin-standard bistros.
-            Connect diners, artisan kitchens, and swift couriers in real time.
-          </p>
+            {/* Subtitle */}
+            <p className="text-base sm:text-xl max-w-2xl text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed">
+              From sizzling local street eats to Michelin-standard bistros.
+              Connect diners, artisan kitchens, and swift couriers in real time.
+            </p>
+          </FadeInUp>
 
           {/* Interactive Search & Location Box */}
           <form
@@ -278,7 +279,6 @@ export const HomePage: React.FC = () => {
               </div>
             }
           </div>
-
         </div>
       </section>
 
@@ -294,9 +294,9 @@ export const HomePage: React.FC = () => {
               <span>Live Verified Kitchens</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              {locationState.city
-                ? `Sellers near ${locationState.city}`
-                : "Trending Sellers Near You"}
+              {locationState.city ?
+                `Sellers near ${locationState.city}`
+              : "Trending Sellers Near You"}
             </h2>
           </div>
           <div className="flex items-center gap-3">
@@ -306,7 +306,9 @@ export const HomePage: React.FC = () => {
               className="text-xs font-bold text-orange-500 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <MapPin className="w-3.5 h-3.5" />
-              <span>{locationState.city || locationState.address || "Select Pin"}</span>
+              <span>
+                {locationState.city || locationState.address || "Select Pin"}
+              </span>
             </button>
             {nearbyData && (
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
@@ -317,7 +319,7 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* State 1: No GPS Coords Detected */}
-        {!locationState.coords && locationState.status !== "loading" ? (
+        {!locationState.coords && locationState.status !== "loading" ?
           <div className="p-8 sm:p-12 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-800 text-center flex flex-col items-center justify-center bg-zinc-50/50 dark:bg-zinc-900/30">
             <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-4">
               <MapPin className="w-7 h-7" />
@@ -326,7 +328,8 @@ export const HomePage: React.FC = () => {
               Set Your Delivery Pin
             </h3>
             <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mb-5 leading-relaxed">
-              Detect your browser GPS or choose your street address to see active kitchens delivering to your door.
+              Detect your browser GPS or choose your street address to see
+              active kitchens delivering to your door.
             </p>
             <button
               type="button"
@@ -337,7 +340,7 @@ export const HomePage: React.FC = () => {
               <span>Choose Location</span>
             </button>
           </div>
-        ) : isRestaurantsLoading || locationState.status === "loading" ? (
+        : isRestaurantsLoading || locationState.status === "loading" ?
           /* State 2: Loading Skeletons */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[1, 2, 3, 4].map((n) => (
@@ -351,15 +354,16 @@ export const HomePage: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : liveRestaurants.length > 0 ? (
+        : liveRestaurants.length > 0 ?
           /* State 3: Live Nearby Restaurant Cards */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <CardRevealStagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {liveRestaurants.map((resto) => (
-              <SellerCard key={resto.id} seller={resto} />
+              <CardRevealItem key={resto.id}>
+                <SellerCard seller={resto} />
+              </CardRevealItem>
             ))}
-          </div>
-        ) : (
-          /* State 4: Empty Results */
+          </CardRevealStagger>
+        : /* State 4: Empty Results */
           <div className="p-12 rounded-3xl border border-zinc-200 dark:border-zinc-800 text-center flex flex-col items-center justify-center bg-zinc-50/50 dark:bg-zinc-900/40">
             <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center mb-4">
               <UtensilsCrossed className="w-7 h-7" />
@@ -368,9 +372,10 @@ export const HomePage: React.FC = () => {
               No kitchens found nearby
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mb-5">
-              {searchQuery
-                ? `We couldn't find any sellers matching "${searchQuery}" in your current radius.`
-                : "There are no verified sellers within 5km of your selected location."}
+              {searchQuery ?
+                `We couldn't find any sellers matching "${searchQuery}" in your current radius.`
+              : "There are no verified sellers within 5km of your selected location."
+              }
             </p>
             <div className="flex items-center gap-3">
               {searchQuery && (
@@ -391,7 +396,7 @@ export const HomePage: React.FC = () => {
               </button>
             </div>
           </div>
-        )}
+        }
       </section>
 
       {/* 4. ECOSYSTEM METRICS & TRUST COUNTER */}

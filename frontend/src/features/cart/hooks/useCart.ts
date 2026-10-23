@@ -55,6 +55,7 @@ export const useCart = () => {
         price: Number(entry.item?.price || 0),
         image: entry.item?.image || '',
         isVeg: entry.item?.isVeg ?? true,
+        isAvailable: entry.item?.isAvailable ?? true,
         quantity: entry.quantity,
         sellerId: entry.sellerId,
         sellerName: entry.seller?.name || '',
@@ -240,12 +241,25 @@ export const useCart = () => {
   const isMutating =
     isAdding || isIncrementing || isDecrementing || isRemoving || isClearing;
 
+  const subTotal = cartState.totalAmount;
+  const deliveryFee =
+    cartState.items.length > 0 ? (subTotal < 350 ? 49 : 0) : 0;
+  const platfromFee = cartState.items.length > 0 ? 7 : 0;
+  const platformFee = platfromFee;
+  const grandTotal =
+    Math.round((subTotal + deliveryFee + platfromFee) * 100) / 100;
+
   return {
     items: cartState.items,
     sellerId: cartState.sellerId,
     sellerName: cartState.sellerName,
     totalQuantity: cartState.totalQuantity,
     totalAmount: cartState.totalAmount,
+    subTotal,
+    deliveryFee,
+    platfromFee,
+    platformFee,
+    grandTotal,
     isLoading: isCartLoading || isMutating,
     addToCart,
     incrementItem,

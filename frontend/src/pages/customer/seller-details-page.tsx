@@ -19,6 +19,7 @@ import type { Seller } from '../../features/seller/types/seller.types';
 import { useCart } from '../../features/cart/hooks/useCart';
 import { RestaurantConflictModal } from '../../features/cart/components/restaurant-conflict-modal';
 import { formatCurrency } from '../../lib/utils';
+import { CardRevealStagger, CardRevealItem, FadeInUp } from '../../lib/animations';
 
 export const SellerDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -129,7 +130,7 @@ export const SellerDetailsPage: React.FC = () => {
         {/* Menu Section */}
         <div className="space-y-6 pt-4">
           {/* Header & Filter Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+          <FadeInUp className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
             <div>
               <h2 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
                 <span>Menu Catalog</span>
@@ -195,7 +196,7 @@ export const SellerDetailsPage: React.FC = () => {
                 />
               </div>
             </div>
-          </div>
+          </FadeInUp>
 
           {/* Menu Items Grid */}
           {isMenuLoading ? (
@@ -208,8 +209,9 @@ export const SellerDetailsPage: React.FC = () => {
               ))}
             </div>
           ) : filteredMenuItems.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardRevealStagger className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredMenuItems.map((item) => (
+                <CardRevealItem key={item.id}>
                 <div
                   key={item.id}
                   className="group relative flex items-center justify-between gap-4 p-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md hover:border-orange-500/30 transition-all duration-300"
@@ -235,7 +237,7 @@ export const SellerDetailsPage: React.FC = () => {
                     </div>
 
                     {item.description && (
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed">
                         {item.description}
                       </p>
                     )}
@@ -310,8 +312,9 @@ export const SellerDetailsPage: React.FC = () => {
                     })()}
                   </div>
                 </div>
-              ))}
-            </div>
+              </CardRevealItem>
+            ))}
+            </CardRevealStagger>
           ) : (
             <div className="py-16 text-center">
               <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center mx-auto mb-3">

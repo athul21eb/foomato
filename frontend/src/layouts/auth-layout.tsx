@@ -1,5 +1,5 @@
 import React from "react";
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, Link, ScrollRestoration } from "react-router-dom";
 
 import { ThemeToggle } from "../components/common/theme-toggle";
 import { useTheme } from "../context/use-theme";
@@ -20,6 +20,8 @@ export const AuthLayout: React.FC = () => {
         : "bg-[#f4f4f5] text-zinc-900"
       }`}
     >
+      <ScrollRestoration />
+
       {/* Background ambient radial gradients */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-tr from-orange-500/15 to-amber-500/15 rounded-full blur-3xl" />

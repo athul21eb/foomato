@@ -1,8 +1,9 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MapPin, Star, ShieldCheck } from 'lucide-react';
-import type { NearbySeller } from '../types/seller.types';
-import { formatDistance } from '../utils/seller.utils';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { MapPin, Star, ShieldCheck } from "lucide-react";
+import type { NearbySeller } from "../types/seller.types";
+import { formatDistance } from "../utils/seller.utils";
+import { InteractiveCard } from "../../../lib/animations";
 
 interface SellerCardProps {
   seller: NearbySeller;
@@ -17,17 +18,17 @@ export const SellerCard: React.FC<SellerCardProps> = ({ seller }) => {
   };
 
   return (
-    <div
+    <InteractiveCard
       onClick={handleClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           handleClick();
         }
       }}
-      className="group relative flex flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer text-left"
+      className="group relative flex flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md shadow-xs hover:shadow-xl transition-all duration-300 cursor-pointer text-left"
     >
       {/* Photo Container */}
       <div className="relative aspect-4/3 w-full overflow-hidden bg-zinc-800">
@@ -44,17 +45,17 @@ export const SellerCard: React.FC<SellerCardProps> = ({ seller }) => {
           {/* Status Badge */}
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide backdrop-blur-md shadow-xs ${
-              seller.isOpen
-                ? 'bg-emerald-500/90 text-white shadow-emerald-500/20'
-                : 'bg-zinc-800/90 text-zinc-300'
+              seller.isOpen ?
+                "bg-emerald-500/90 text-white shadow-emerald-500/20"
+              : "bg-zinc-800/90 text-zinc-300"
             }`}
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                seller.isOpen ? 'bg-white animate-pulse' : 'bg-zinc-400'
+                seller.isOpen ? "bg-white animate-pulse" : "bg-zinc-400"
               }`}
             />
-            {seller.isOpen ? 'Open Now' : 'Closed'}
+            {seller.isOpen ? "Open Now" : "Closed"}
           </span>
 
           {/* Verified Badge */}
@@ -95,10 +96,10 @@ export const SellerCard: React.FC<SellerCardProps> = ({ seller }) => {
 
         {/* Address / Footer Strip */}
         <div className="mt-auto pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500">
-          <div className="flex items-center gap-1 truncate max-w-[75%]">
+          <div className="flex items-center gap-1 truncate max-w-[67%] md:max-w-[50%]">
             <MapPin className="w-3 h-3 shrink-0 text-zinc-400" />
             <span className="truncate">
-              {seller.autoLocation?.formattedAddress || 'Nearby Kitchen'}
+              {seller.autoLocation?.formattedAddress || "Nearby Kitchen"}
             </span>
           </div>
           <span className="inline-flex items-center gap-1 text-orange-500 font-bold shrink-0">
@@ -106,7 +107,7 @@ export const SellerCard: React.FC<SellerCardProps> = ({ seller }) => {
           </span>
         </div>
       </div>
-    </div>
+    </InteractiveCard>
   );
 };
 

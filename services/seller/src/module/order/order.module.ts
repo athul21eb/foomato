@@ -6,7 +6,7 @@ import { AddressModule } from '../address/address.module';
 import { SellerModule } from '../seller/seller.module';
 import { OrderController } from './order.controller';
 import { OrderService } from './order.service';
-import { InternalKeyGuard } from '../../common/guards/internal-key.guard';
+import { PaymentSuccessConsumer } from './consumers/payment-success.consumer';
 
 @Module({
   imports: [
@@ -17,7 +17,7 @@ import { InternalKeyGuard } from '../../common/guards/internal-key.guard';
     ConfigModule,
   ],
   controllers: [OrderController],
-  providers: [OrderService, InternalKeyGuard],
+  providers: [OrderService, PaymentSuccessConsumer],
   exports: [OrderService],
 })
 export class OrderModule {}

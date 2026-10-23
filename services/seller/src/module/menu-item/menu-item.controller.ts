@@ -16,7 +16,7 @@ import { SellerGuard } from '../../common/guards/seller.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 
-@Controller(['menu-item', 'menuItem'])
+@Controller('menu-item')
 export class MenuItemController {
   constructor(private readonly menuItemService: MenuItemService) {}
 

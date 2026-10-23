@@ -5,6 +5,7 @@ import { GoogleLoginBtn } from "../features/auth/components/google-login-btn";
 import { useAuth } from "../context/use-auth";
 import { useTheme } from "../context/use-theme";
 import { LoadingScreen } from "../components/feedback/loading-screen";
+import { ScaleIn, FadeInUp } from "../lib/animations";
 
 export const LoginPage: React.FC = () => {
   const { isAuthenticated, user, isLoading, isLoggingOut } = useAuth();
@@ -49,7 +50,9 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div
+    <ScaleIn
+      duration={0.35}
+      initialScale={0.96}
       className={`p-8 sm:p-10 rounded-3xl border backdrop-blur-2xl transition-all duration-300 shadow-2xl ${
         theme === "dark" ?
           "bg-zinc-900/80 border-zinc-800/90 text-white shadow-black/60"
@@ -57,7 +60,7 @@ export const LoginPage: React.FC = () => {
       }`}
     >
       {/* Header */}
-      <div className="flex flex-col items-center text-center mb-8">
+      <FadeInUp delay={0.05} className="flex flex-col items-center text-center mb-8">
         <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shadow-xl shadow-orange-500/25 mb-4 hover:scale-105 transition-transform">
           <img
             src="/foomato.png"
@@ -72,20 +75,20 @@ export const LoginPage: React.FC = () => {
           Sign in securely to explore menus, manage deliveries, or run your
           kitchen.
         </p>
-      </div>
+      </FadeInUp>
 
       {/* Google Login Component */}
-      <div className="w-full flex justify-center my-4">
+      <FadeInUp delay={0.1} className="w-full flex justify-center my-4">
         <GoogleLoginBtn />
-      </div>
+      </FadeInUp>
 
       {/* Privacy & Terms Note */}
-      <div className="mt-8 pt-6 border-t border-zinc-500/10 text-center">
+      <FadeInUp delay={0.15} className="mt-8 pt-6 border-t border-zinc-500/10 text-center">
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
           <ShieldAlert className="w-3.5 h-3.5" />
           <span>Single sign-on protected by Google Identity Services</span>
         </div>
-      </div>
-    </div>
+      </FadeInUp>
+    </ScaleIn>
   );
 };

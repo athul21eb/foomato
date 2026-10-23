@@ -6,6 +6,7 @@ export interface CartItem {
   price: number;
   image: string;
   isVeg: boolean;
+  isAvailable?: boolean;
   quantity: number;
   sellerId: string;
   sellerName?: string;
@@ -91,7 +92,7 @@ export const cartSlice = createSlice({
       state,
       action: PayloadAction<Omit<CartItem, 'quantity'>>,
     ) => {
-      const { id, name, price, image, isVeg, sellerId, sellerName, description } =
+      const { id, name, price, image, isVeg, isAvailable, sellerId, sellerName, description } =
         action.payload;
 
       // If cart already contains items from a different seller, replace cart with new seller's items
@@ -103,6 +104,7 @@ export const cartSlice = createSlice({
             price: Number(price),
             image,
             isVeg,
+            isAvailable: isAvailable ?? true,
             quantity: 1,
             sellerId,
             sellerName,
@@ -122,6 +124,7 @@ export const cartSlice = createSlice({
             price: Number(price),
             image,
             isVeg,
+            isAvailable: isAvailable ?? true,
             quantity: 1,
             sellerId,
             sellerName,

@@ -11,6 +11,7 @@ interface PopulatedMenuItem {
   price: number;
   image: string;
   isVeg: boolean;
+  isAvailable?: boolean;
   description?: string;
 }
 
@@ -79,6 +80,7 @@ export class MongooseCartRepository implements ICartRepository {
         price: populatedItem.price,
         image: populatedItem.image,
         isVeg: populatedItem.isVeg,
+        isAvailable: populatedItem.isAvailable ?? true,
         description: populatedItem.description,
       };
     }

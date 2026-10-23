@@ -38,8 +38,10 @@ export class RazorpayService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit(): void {
-    const keyId = this.configService.get<string>('RAZORPAY_KEY_ID');
-    const keySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
+    const keyId = this.configService.getOrThrow<string>('RAZORPAY_KEY_ID');
+    const keySecret = this.configService.getOrThrow<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
 
     if (!keyId || !keySecret) {
       this.logger.warn(
@@ -93,7 +95,7 @@ export class RazorpayService implements OnModuleInit {
       });
 
       this.logger.log(
-        `Created Razorpay order: ${order.id} for ${amountInSubunits} ${currency}`,
+        `Created Razorpay order: ${order.id} for ${amountInSubunits / 100} ${currency}`,
       );
       return order;
     } catch (error) {

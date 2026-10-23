@@ -5,7 +5,6 @@ import { Order, OrderDocument } from './order.schema';
 import {
   OrderEntity,
   OrderStatus,
-  PaymentMethod,
   PaymentStatus,
 } from '../../domain/order.entity';
 import { IOrderRepository } from '../../interfaces/order.repository.interface';
@@ -21,6 +20,8 @@ export class MongooseOrderRepository implements IOrderRepository {
     if (!doc) return null;
     return new OrderEntity({
       id: doc._id.toString(),
+      orderNumber:
+        doc.orderNumber || `FOO-${doc._id.toString().slice(-8).toUpperCase()}`,
       userId: doc.userId,
       restaurantId: doc.restaurantId,
       restaurantName: doc.restaurantName,
@@ -38,7 +39,6 @@ export class MongooseOrderRepository implements IOrderRepository {
       })),
       subtotal: doc.subtotal,
       deliveryFee: doc.deliveryFee,
-      platfromFee: doc.platfromFee,
       platformFee: doc.platfromFee,
       totalAmount: doc.totalAmount,
       addressId: doc.addressId,
@@ -49,9 +49,10 @@ export class MongooseOrderRepository implements IOrderRepository {
         latitude: doc.deliveryAddress.latitude,
         longitude: doc.deliveryAddress.longitude,
       },
-      status: doc.status as OrderStatus,
-      paymentMethod: doc.paymentMethod as PaymentMethod,
-      paymentStatus: doc.paymentStatus as PaymentStatus,
+      status: doc.status,
+      paymentMethod: doc.paymentMethod,
+      paymentStatus: doc.paymentStatus,
+      reason: doc.reason ?? undefined,
       expiresAt: doc.expiresAt ?? null,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
@@ -60,6 +61,7 @@ export class MongooseOrderRepository implements IOrderRepository {
 
   async create(order: Partial<OrderEntity>): Promise<OrderEntity> {
     const created = await this.orderModel.create({
+      orderNumber: order.orderNumber,
       userId: order.userId,
       restaurantId: order.restaurantId,
       restaurantName: order.restaurantName,
@@ -76,7 +78,7 @@ export class MongooseOrderRepository implements IOrderRepository {
       })),
       subtotal: order.subtotal,
       deliveryFee: order.deliveryFee,
-      platfromFee: order.platfromFee ?? order.platformFee ?? 0,
+      platfromFee: order.platformFee ?? 0,
       totalAmount: order.totalAmount,
       addressId: order.addressId,
       deliveryAddress: {
@@ -119,13 +121,79 @@ export class MongooseOrderRepository implements IOrderRepository {
     return docs.map((doc) => this.toDomain(doc)!);
   }
 
+  async findSellerOrders(
+    restaurantId: string,
+    page: number = 1,
+    limit: number = 10,
+    status?: OrderStatus,
+  ): Promise<{
+    orders: OrderEntity[];
+    total: number;
+    counts?: Record<string, number>;
+  }> {
+    const filter: Record<string, unknown> = { restaurantId };
+    if (status) {
+      filter.status = status;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [docs, total, aggCounts] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments(filter).exec(),
+      this.orderModel.aggregate([
+        { $match: { restaurantId } },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const counts: Record<string, number> = {
+      all: 0,
+      placed: 0,
+      accepted: 0,
+      preparing: 0,
+      ready_for_rider: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+
+    let totalAll = 0;
+    for (const item of aggCounts as Array<{ _id: string; count: number }>) {
+      if (item._id && typeof item.count === 'number') {
+        counts[item._id] = item.count;
+        totalAll += item.count;
+      }
+    }
+    counts.all = totalAll;
+
+    const orders = docs
+      .map((doc) => this.toDomain(doc))
+      .filter((order): order is OrderEntity => order !== null);
+
+    return { orders, total, counts };
+  }
+
   async updateStatus(
     id: string,
     status: OrderStatus,
+    reason?: string,
   ): Promise<OrderEntity | null> {
     if (!Types.ObjectId.isValid(id)) return null;
+    const updatePayload: Record<string, unknown> = { status };
+    if (reason !== undefined) {
+      updatePayload.reason = reason;
+    }
     const doc = await this.orderModel
-      .findByIdAndUpdate(id, { $set: { status } }, { new: true })
+      .findByIdAndUpdate(
+        id,
+        { $set: updatePayload },
+        { returnDocument: 'after' },
+      )
       .exec();
     return this.toDomain(doc);
   }
@@ -135,12 +203,42 @@ export class MongooseOrderRepository implements IOrderRepository {
     paymentStatus: PaymentStatus,
   ): Promise<OrderEntity | null> {
     if (!Types.ObjectId.isValid(id)) return null;
-    const updateQuery: Record<string, unknown> = { paymentStatus };
+    const updateQuery: Record<string, unknown> = {
+      $set: { paymentStatus },
+    };
     if (paymentStatus === 'paid') {
-      updateQuery.expiresAt = null; // Clear TTL expiration on payment
+      updateQuery.$unset = { expiresAt: 1 };
     }
     const doc = await this.orderModel
-      .findByIdAndUpdate(id, { $set: updateQuery }, { new: true })
+      .findByIdAndUpdate(id, updateQuery, { returnDocument: 'after' })
+      .exec();
+    return this.toDomain(doc);
+  }
+
+  async findActivePendingByUserId(userId: string): Promise<OrderEntity | null> {
+    const doc = await this.orderModel
+      .findOne({
+        userId,
+        status: 'placed',
+        paymentStatus: 'pending',
+        expiresAt: { $gt: new Date() },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+    return this.toDomain(doc);
+  }
+
+  async updatePaymentMethod(
+    id: string,
+    paymentMethod: string,
+  ): Promise<OrderEntity | null> {
+    if (!Types.ObjectId.isValid(id)) return null;
+    const doc = await this.orderModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { paymentMethod } },
+        { returnDocument: 'after' },
+      )
       .exec();
     return this.toDomain(doc);
   }

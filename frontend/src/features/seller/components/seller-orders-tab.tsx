@@ -7,228 +7,337 @@ import {
   MapPin,
   CookingPot,
   Bike,
-  ChevronLeft,
-  ChevronRight,
+  Bell,
+  BellOff,
+  Volume2,
+  XCircle,
+  AlertCircle,
+  Phone,
+  RefreshCw,
 } from 'lucide-react';
+import { Pagination } from '../../../components/ui/pagination';
+import {
+  AnimatePresence,
+  AnimatedOrderList,
+  AnimatedOrderCard,
+  AnimatedStatusTab,
+} from '../../../lib/animations';
 import { toast } from 'sonner';
 import { formatCurrency } from '../../../lib/utils';
-
-export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'delivered';
-
-export interface OrderItem {
-  name: string;
-  quantity: number;
-  price: number;
-  notes?: string;
-}
-
-export interface SellerOrder {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  customerPhone: string;
-  deliveryAddress: string;
-  items: OrderItem[];
-  totalAmount: number;
-  paymentMethod: string;
-  status: OrderStatus;
-  createdAt: string;
-}
-
-const INITIAL_ORDERS: SellerOrder[] = [
-  {
-    id: 'o1',
-    orderNumber: '#ORD-8492',
-    customerName: 'Rahul Verma',
-    customerPhone: '+91 98450 12345',
-    deliveryAddress: 'Flat 402, Skyline Heights, Marine Drive, Kochi',
-    items: [
-      { name: 'Butter Chicken Masala', quantity: 2, price: 320 },
-      { name: 'Garlic Butter Naan', quantity: 4, price: 65, notes: 'Extra crispy' },
-      { name: 'Fresh Mango Lassi', quantity: 2, price: 110 },
-    ],
-    totalAmount: 1120,
-    paymentMethod: 'Paid via UPI',
-    status: 'pending',
-    createdAt: '3 mins ago',
-  },
-  {
-    id: 'o2',
-    orderNumber: '#ORD-8488',
-    customerName: 'Ananya Sharma',
-    customerPhone: '+91 97412 88921',
-    deliveryAddress: 'Villa 12, Palm Meadows, Kakkanad, Kochi',
-    items: [
-      { name: 'Paneer Tikka Platter', quantity: 1, price: 260 },
-      { name: 'Hyderabadi Dum Biryani', quantity: 1, price: 340, notes: 'Mild spicy' },
-    ],
-    totalAmount: 600,
-    paymentMethod: 'Paid via Cards',
-    status: 'preparing',
-    createdAt: '12 mins ago',
-  },
-  {
-    id: 'o3',
-    orderNumber: '#ORD-8481',
-    customerName: 'Karthik Menon',
-    customerPhone: '+91 99823 44102',
-    deliveryAddress: 'Door 24, Panampilly Nagar, Kochi',
-    items: [
-      { name: 'Hyderabadi Dum Biryani', quantity: 2, price: 340 },
-      { name: 'Gulab Jamun with Rabri', quantity: 2, price: 140 },
-    ],
-    totalAmount: 960,
-    paymentMethod: 'Paid via NetBanking',
-    status: 'ready',
-    createdAt: '25 mins ago',
-  },
-  {
-    id: 'o4',
-    orderNumber: '#ORD-8475',
-    customerName: 'Pooja Nair',
-    customerPhone: '+91 94471 55601',
-    deliveryAddress: 'Apt 3B, Silver Mist, Edappally, Kochi',
-    items: [
-      { name: 'Butter Chicken Masala', quantity: 1, price: 320 },
-      { name: 'Garlic Butter Naan', quantity: 2, price: 65 },
-    ],
-    totalAmount: 450,
-    paymentMethod: 'Cash on Delivery',
-    status: 'delivered',
-    createdAt: '1 hour ago',
-  },
-];
+import {
+  useGetSellerOrdersQuery,
+  useUpdateOrderStatusMutation,
+} from '../../../slices/order/orderApiSlice';
+import { useSellerSocket } from '../hooks/use-seller-socket';
+import type { OrderDetails } from '../../checkout/types/checkout.types';
 
 interface SellerOrdersTabProps {
   seller: Seller;
+  socketProps?: ReturnType<typeof useSellerSocket>;
 }
 
-export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({ seller }) => {
-  const [orders, setOrders] = useState<SellerOrder[]>(INITIAL_ORDERS);
+export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
+  seller,
+  socketProps,
+}) => {
   const [activeStatus, setActiveStatus] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [cancelModalOrder, setCancelModalOrder] = useState<OrderDetails | null>(
+    null,
+  );
+  const [cancellationReason, setCancellationReason] = useState<string>('');
 
-  const ORDERS_PER_PAGE = 3;
+  const ORDERS_PER_PAGE = 5;
 
-  const handleUpdateStatus = (orderId: string, nextStatus: OrderStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)),
-    );
+  // Initialize or inherit Realtime WebSocket Connection & Sound Chimes
+  const fallbackSocket = useSellerSocket({
+    sellerId: socketProps ? undefined : seller.id,
+  });
+  const { isConnected, isMuted, toggleMute, playNotificationSound } =
+    socketProps ?? fallbackSocket;
 
-    const labels: Record<OrderStatus, string> = {
-      pending: 'Order marked as Pending',
-      preparing: 'Order accepted! Now preparing in kitchen',
-      ready: 'Order is ready for rider pickup!',
-      delivered: 'Order fulfilled and delivered!',
-    };
-    toast.success(labels[nextStatus]);
-  };
-
-  const filteredOrders = orders.filter((o) => {
-    if (activeStatus === 'all') return true;
-    return o.status === activeStatus;
+  // Live RTK Query
+  const {
+    data: ordersData,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useGetSellerOrdersQuery({
+    page: currentPage,
+    limit: ORDERS_PER_PAGE,
+    status: activeStatus === 'all' ? undefined : activeStatus,
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedOrders = filteredOrders.slice(
-    (safePage - 1) * ORDERS_PER_PAGE,
-    safePage * ORDERS_PER_PAGE,
-  );
+  const [updateStatus, { isLoading: isUpdating }] =
+    useUpdateOrderStatusMutation();
 
-  const handlePageChange = (p: number) => {
-    if (p >= 1 && p <= totalPages) {
-      setCurrentPage(p);
+  const orders = ordersData?.orders || [];
+  const totalOrders = ordersData?.total || 0;
+  const totalPages = ordersData?.totalPages || 1;
+  const counts = ordersData?.counts;
+
+  // Handle status update
+  const handleUpdateStatus = async (
+    orderId: string,
+    nextStatus: string,
+    reason?: string,
+  ) => {
+    try {
+      await updateStatus({
+        orderId,
+        status: nextStatus,
+        reason,
+      }).unwrap();
+
+      const labels: Record<string, string> = {
+        accepted: 'Order accepted! Moved to preparation queue.',
+        preparing: 'Kitchen started cooking this order.',
+        ready_for_rider: 'Order marked ready for delivery rider pickup!',
+        cancelled: 'Order has been cancelled.',
+      };
+
+      toast.success(labels[nextStatus] || `Order updated to ${nextStatus}`);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'data' in err
+          ? (err as { data: { message?: string } }).data.message
+          : 'Failed to update order status';
+      toast.error(message || 'Failed to update status');
     }
   };
 
-  const pendingCount = orders.filter((o) => o.status === 'pending').length;
-  const preparingCount = orders.filter((o) => o.status === 'preparing').length;
-  const readyCount = orders.filter((o) => o.status === 'ready').length;
-  const deliveredCount = orders.filter((o) => o.status === 'delivered').length;
+  const handleConfirmCancel = async () => {
+    if (!cancelModalOrder) return;
+    await handleUpdateStatus(
+      cancelModalOrder.id,
+      'cancelled',
+      cancellationReason.trim() || undefined,
+    );
+    setCancelModalOrder(null);
+    setCancellationReason('');
+  };
+
+  const formatOrderTime = (dateStr?: string): string => {
+    if (!dateStr) return 'Just now';
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMins = Math.floor((now.getTime() - date.getTime()) / 60000);
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return date.toLocaleDateString('en-IN', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const statusPills = [
+    { id: 'all', label: 'All', count: counts?.all ?? totalOrders },
+    {
+      id: 'placed',
+      label: 'Incoming',
+      count: counts?.placed ?? 0,
+      highlight: true,
+    },
+    { id: 'accepted', label: 'Accepted', count: counts?.accepted ?? 0 },
+    { id: 'preparing', label: 'In Kitchen', count: counts?.preparing ?? 0 },
+    {
+      id: 'ready_for_rider',
+      label: 'Ready',
+      count: counts?.ready_for_rider ?? 0,
+    },
+    { id: 'delivered', label: 'Completed', count: counts?.delivered ?? 0 },
+    { id: 'cancelled', label: 'Cancelled', count: counts?.cancelled ?? 0 },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Top Header Card */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
               Live Orders
             </h2>
-            {pendingCount > 0 && (
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 animate-pulse">
-                {pendingCount} Action Required
+            {totalOrders > 0 && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                {totalOrders} {totalOrders === 1 ? 'order' : 'orders'}
               </span>
             )}
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Accept incoming customer tickets and coordinate kitchen preparation for {seller.name}
+            Accept incoming customer orders and coordinate kitchen preparation
+            for {seller.name}
           </p>
         </div>
 
-        {/* Live sync pill */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/60 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Kitchen Live Sync Active</span>
+        {/* Live Controls: Bell Sound Toggle + Kitchen Live Sync Active */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Notification Sound Bell Button */}
+          <button
+            type="button"
+            onClick={toggleMute}
+            title={
+              isMuted
+                ? 'Sound muted. Click to enable audio chime on new orders'
+                : 'Audio chime active. Click to mute'
+            }
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+              isMuted
+                ? 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                : 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-sm shadow-amber-500/10'
+            }`}
+          >
+            {isMuted ? (
+              <>
+                <BellOff className="w-4 h-4 text-zinc-400" />
+                <span className="text-[11px]">Sound Off</span>
+              </>
+            ) : (
+              <>
+                <Bell className="w-4 h-4 text-amber-500 animate-bounce" />
+                <span className="text-[11px]">Sound On</span>
+              </>
+            )}
+          </button>
+
+          {/* Test Sound Chime Button */}
+          {!isMuted && (
+            <button
+              type="button"
+              onClick={playNotificationSound}
+              title="Test chime playback"
+              className="p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-500 hover:text-amber-500 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Live Sync Pill */}
+          <div
+            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl border text-xs font-semibold ${
+              isConnected
+                ? 'bg-zinc-100 dark:bg-zinc-800/80 border-zinc-200/60 dark:border-zinc-700/60 text-zinc-600 dark:text-zinc-300'
+                : 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isConnected
+                  ? 'bg-emerald-500 animate-pulse'
+                  : 'bg-amber-500 animate-ping'
+              }`}
+            />
+            <span>{isConnected ? 'Kitchen Live Sync' : 'Connecting...'}</span>
+          </div>
+
+          {/* Refresh Button */}
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            title="Refresh order queue"
+            className="p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-500 hover:text-orange-500 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin text-orange-500' : ''}`}
+            />
+          </button>
         </div>
       </div>
 
-      {/* Filter Tabs Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-        {[
-          { id: 'all', label: 'All Orders', count: orders.length },
-          { id: 'pending', label: 'Incoming', count: pendingCount, highlight: pendingCount > 0 },
-          { id: 'preparing', label: 'In Kitchen', count: preparingCount },
-          { id: 'ready', label: 'Ready for Pickup', count: readyCount },
-          { id: 'delivered', label: 'Completed', count: deliveredCount },
-        ].map((tab) => {
-          const isSelected = activeStatus === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setActiveStatus(tab.id);
-                setCurrentPage(1);
-              }}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                isSelected
-                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-md'
-                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  isSelected
-                    ? 'bg-white/20 dark:bg-black/20 text-white dark:text-zinc-900 font-extrabold'
-                    : tab.highlight
-                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold'
-                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
-                }`}
-              >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Orders List */}
-      {filteredOrders.length > 0 ? (
-        <div className="space-y-4">
-          {paginatedOrders.map((order) => {
-            const isPending = order.status === 'pending';
-            const isPreparing = order.status === 'preparing';
-            const isReady = order.status === 'ready';
-            const isDelivered = order.status === 'delivered';
+      {/* Filter Tabs Bar - Segmented Allocation */}
+      <div className="p-1 sm:p-1.5 rounded-2xl bg-zinc-100/90 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar sm:grid sm:grid-cols-7 w-full">
+          {statusPills.map((tab) => {
+            const isSelected = activeStatus === tab.id;
+            const hasCount = typeof tab.count === 'number' && tab.count > 0;
+            const isIncomingWithOrders = tab.id === 'placed' && hasCount;
 
             return (
-              <div
-                key={order.id}
-                className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4"
+              <AnimatedStatusTab
+                key={tab.id}
+                type="button"
+                isPulseYellowWhite={isIncomingWithOrders}
+                onClick={() => {
+                  setActiveStatus(tab.id);
+                  setCurrentPage(1);
+                }}
+                className={`relative py-2 px-1 rounded-xl text-xs font-bold whitespace-nowrap transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 shrink-0 sm:shrink sm:w-full select-none ${
+                  isIncomingWithOrders
+                    ? 'font-black ring-1 ring-amber-400'
+                    : isSelected
+                      ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs ring-1 ring-zinc-900/5 dark:ring-white/10'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-white/60 dark:hover:bg-zinc-700/50'
+                }`}
               >
+                <span className="truncate">{tab.label}</span>
+
+                {/* Badge count */}
+                <span
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold transition-colors shrink-0 ${
+                    isIncomingWithOrders
+                      ? 'bg-zinc-900 text-white font-black shadow-xs'
+                      : isSelected
+                        ? 'bg-orange-500 text-white shadow-2xs'
+                        : hasCount
+                          ? 'bg-zinc-200/90 dark:bg-zinc-700/90 text-zinc-800 dark:text-zinc-200'
+                          : 'bg-zinc-200/50 dark:bg-zinc-700/50 text-zinc-400 dark:text-zinc-500'
+                  }`}
+                >
+                  {tab.count ?? 0}
+                </span>
+              </AnimatedStatusTab>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Orders List View */}
+      {isLoading ? (
+        <div className="py-16 text-center space-y-3">
+          <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin mx-auto" />
+          <p className="text-xs text-zinc-500 font-semibold">
+            Loading kitchen orders...
+          </p>
+        </div>
+      ) : orders.length > 0 ? (
+        <AnimatedOrderList className="space-y-4">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {orders.map((order, index) => {
+              const isPlaced = order.status === 'placed';
+              const isAccepted = order.status === 'accepted';
+              const isPreparing = order.status === 'preparing';
+              const isReady = order.status === 'ready_for_rider';
+              const isDelivered = order.status === 'delivered';
+              const isCancelled = order.status === 'cancelled';
+
+              const formattedAddress =
+                order.deliveryAddress?.formattedAddress ||
+                order.deliveryAddress?.fromattedAddress ||
+                'Standard Delivery Location';
+
+              const customerPhone = order.deliveryAddress?.mobile
+                ? String(order.deliveryAddress.mobile)
+                : '';
+
+              const orderDisplayNum = order.orderNumber
+                ? `#${order.orderNumber}`
+                : `#ORD-${order.id.slice(-6).toUpperCase()}`;
+
+              return (
+                <AnimatedOrderCard
+                  key={order.id}
+                  index={index}
+                  className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 p-5 sm:p-6 shadow-xs hover:shadow-md transition-shadow space-y-4"
+                >
                 {/* Order Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-zinc-100 dark:border-zinc-800">
                   <div className="flex items-center gap-3">
@@ -238,40 +347,62 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({ seller }) => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-white">
-                          {order.orderNumber}
+                          {orderDisplayNum}
                         </span>
-                        <span className="text-xs text-zinc-400">• {order.createdAt}</span>
+                        <span className="text-xs text-zinc-400">
+                          • {formatOrderTime(order.createdAt)}
+                        </span>
                       </div>
-                      <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-                        Customer: {order.customerName} ({order.customerPhone})
-                      </p>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 mt-0.5">
+                        {customerPhone && (
+                          <span className="inline-flex items-center gap-1 text-zinc-500">
+                            <Phone className="w-3 h-3 text-zinc-400" />
+                            {customerPhone}
+                          </span>
+                        )}
+                        <span className="text-[11px] px-2 py-0.2 rounded-full font-bold uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                          {order.paymentMethod?.toUpperCase()} • {order.paymentStatus}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Status Badge */}
+                  {/* Status Badges */}
                   <div>
-                    {isPending && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    {isPlaced && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>Incoming Request</span>
+                        <span>Action Required</span>
+                      </span>
+                    )}
+                    {isAccepted && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Accepted Order</span>
                       </span>
                     )}
                     {isPreparing && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
-                        <CookingPot className="w-3.5 h-3.5" />
+                        <CookingPot className="w-3.5 h-3.5 animate-spin" />
                         <span>Cooking in Kitchen</span>
                       </span>
                     )}
                     {isReady && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                         <Bike className="w-3.5 h-3.5" />
-                        <span>Ready for Rider</span>
+                        <span>Awaiting Rider Pickup</span>
                       </span>
                     )}
                     {isDelivered && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                         <span>Fulfilled</span>
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Cancelled</span>
                       </span>
                     )}
                   </div>
@@ -283,150 +414,153 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({ seller }) => {
                     Ordered Dishes
                   </span>
                   <div className="space-y-1.5">
-                    {order.items.map((it, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between text-xs sm:text-sm py-1 border-b border-zinc-100 dark:border-zinc-800/50 last:border-none"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg bg-orange-500/10 text-orange-500 font-bold text-xs flex items-center justify-center shrink-0">
-                            {it.quantity}x
-                          </span>
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                            {it.name}
-                          </span>
-                          {it.notes && (
-                            <span className="text-[11px] text-amber-600 dark:text-amber-400 italic">
-                              ({it.notes})
+                    {order.items?.map((it, idx) => {
+                      const qty = it.quantity || it.quauntity || 1;
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-xs sm:text-sm py-1 border-b border-zinc-100 dark:border-zinc-800/50 last:border-none"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-orange-500/10 text-orange-500 font-bold text-xs flex items-center justify-center shrink-0">
+                              {qty}x
                             </span>
-                          )}
+                            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                              {it.name}
+                            </span>
+                          </div>
+                          <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                            {formatCurrency(it.price * qty)}
+                          </span>
                         </div>
-                        <span className="font-bold text-zinc-700 dark:text-zinc-300">
-                          {formatCurrency(it.price * it.quantity)}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Delivery Address & Payment Summary */}
+                {/* Delivery Address & Financial Summary */}
                 <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-start gap-2 text-xs text-zinc-500 dark:text-zinc-400 max-w-lg">
                     <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
-                    <span className="line-clamp-1">{order.deliveryAddress}</span>
+                    <span className="line-clamp-1">{formattedAddress}</span>
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                      {order.paymentMethod}
-                    </span>
                     <span className="text-base sm:text-lg font-black text-zinc-900 dark:text-white">
                       {formatCurrency(order.totalAmount)}
                     </span>
                   </div>
                 </div>
 
+                {/* Cancellation Reason if cancelled */}
+                {order.reason && (
+                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>Reason: {order.reason}</span>
+                  </div>
+                )}
+
                 {/* Action Buttons Workflow */}
                 <div className="flex items-center justify-end gap-2.5 pt-2">
-                  {isPending && (
+                  {/* When status is 'placed' (Incoming) */}
+                  {isPlaced && (
                     <>
                       <button
                         type="button"
-                        onClick={() => handleUpdateStatus(order.id, 'preparing')}
-                        className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-orange-500/20 cursor-pointer"
+                        disabled={isUpdating}
+                        onClick={() => setCancelModalOrder(order)}
+                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-rose-600 hover:bg-rose-500/10 border border-zinc-200 dark:border-zinc-800 transition-all cursor-pointer disabled:opacity-50"
                       >
-                        Accept & Start Cooking
+                        Decline
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdating}
+                        onClick={() =>
+                          handleUpdateStatus(order.id, 'accepted')
+                        }
+                        className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-linear-to-r from-orange-500 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-orange-500/20 cursor-pointer disabled:opacity-50"
+                      >
+                        Accept Order
                       </button>
                     </>
                   )}
 
+                  {/* When status is 'accepted' */}
+                  {isAccepted && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isUpdating}
+                        onClick={() => setCancelModalOrder(order)}
+                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-rose-600 hover:bg-rose-500/10 border border-zinc-200 dark:border-zinc-800 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdating}
+                        onClick={() =>
+                          handleUpdateStatus(order.id, 'preparing')
+                        }
+                        className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 cursor-pointer disabled:opacity-50"
+                      >
+                        Start Cooking
+                      </button>
+                    </>
+                  )}
+
+                  {/* When status is 'preparing' */}
                   {isPreparing && (
                     <button
                       type="button"
-                      onClick={() => handleUpdateStatus(order.id, 'ready')}
-                      className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                      disabled={isUpdating}
+                      onClick={() =>
+                        handleUpdateStatus(order.id, 'ready_for_rider')
+                      }
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
                     >
-                      Mark as Ready for Pickup
+                      Food Ready for Rider
                     </button>
                   )}
 
+                  {/* When status is 'ready_for_rider' */}
                   {isReady && (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus(order.id, 'delivered')}
-                      className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
-                    >
-                      Handover to Rider & Complete
-                    </button>
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                      <span>Rider Dispatch Active</span>
+                    </div>
                   )}
 
+                  {/* Terminal states */}
                   {isDelivered && (
                     <div className="text-xs font-semibold text-zinc-400 flex items-center gap-1">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       <span>Order Delivered</span>
                     </div>
                   )}
+                  {isCancelled && (
+                    <div className="text-xs font-semibold text-zinc-400 flex items-center gap-1">
+                      <XCircle className="w-4 h-4 text-rose-500" />
+                      <span>Cancelled Order</span>
+                    </div>
+                  )}
                 </div>
-              </div>
+              </AnimatedOrderCard>
             );
           })}
+        </AnimatePresence>
 
-          {/* Orders Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3">
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                Showing{' '}
-                <strong className="text-zinc-900 dark:text-white">
-                  {(safePage - 1) * ORDERS_PER_PAGE + 1}
-                </strong>{' '}
-                to{' '}
-                <strong className="text-zinc-900 dark:text-white">
-                  {Math.min(safePage * ORDERS_PER_PAGE, filteredOrders.length)}
-                </strong>{' '}
-                of{' '}
-                <strong className="text-zinc-900 dark:text-white">
-                  {filteredOrders.length}
-                </strong>{' '}
-                orders
-              </span>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={safePage === 1}
-                  onClick={() => handlePageChange(safePage - 1)}
-                  className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={() => handlePageChange(pageNum)}
-                    className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      pageNum === safePage
-                        ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-                        : 'border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  disabled={safePage === totalPages}
-                  onClick={() => handlePageChange(safePage + 1)}
-                  className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+          {/* Reusable Common Pagination Component */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalOrders}
+            itemName="orders"
+            disabled={isFetching}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
+        </AnimatedOrderList>
       ) : (
         /* Empty State */
         <div className="text-center py-16 px-4 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-white/40 dark:bg-zinc-900/40 space-y-3">
@@ -434,11 +568,75 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({ seller }) => {
             <ShoppingBag className="w-6 h-6" />
           </div>
           <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-            No orders found under "{activeStatus}"
+            No orders found under &quot;{activeStatus}&quot;
           </h3>
           <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            Orders placed by customers will stream directly into your live kitchen queue.
+            When customer orders are confirmed, they will stream directly into
+            this live kitchen queue with sound notifications.
           </p>
+        </div>
+      )}
+
+      {/* Decline / Cancel Reason Modal */}
+      {cancelModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-rose-500">
+                <AlertCircle className="w-5 h-5" />
+                <h3 className="font-extrabold text-base text-zinc-900 dark:text-white">
+                  Decline / Cancel Order
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancelModalOrder(null)}
+                className="p-1 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Are you sure you want to decline order{' '}
+              <strong className="text-zinc-800 dark:text-zinc-200">
+                {cancelModalOrder.orderNumber ||
+                  `#${cancelModalOrder.id.slice(-6).toUpperCase()}`}
+              </strong>
+              ? Please provide a reason for the customer.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                Reason (Optional)
+              </label>
+              <textarea
+                rows={3}
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="e.g. Out of ingredients, Kitchen at maximum capacity, Store closing early..."
+                className="w-full p-3 text-xs rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setCancelModalOrder(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={handleConfirmCancel}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 transition-all shadow-md shadow-rose-500/20 cursor-pointer disabled:opacity-50"
+              >
+                Confirm Cancellation
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

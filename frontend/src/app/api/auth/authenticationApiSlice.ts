@@ -66,8 +66,8 @@ export const requestRefreshToken = async (
             return accessToken;
           }
         }
-      } catch (err) {
-        console.error('Failed to refresh access token:', err);
+      } catch {
+        // Refresh token failed or expired; clear state and force login
       }
 
       dispatch(ClearCredentials());

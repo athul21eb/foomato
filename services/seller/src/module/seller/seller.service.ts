@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -17,6 +18,8 @@ import { GetNearbySellersDto } from './dto/get-nearby-sellers.dto';
 
 @Injectable()
 export class SellerService {
+  private readonly logger = new Logger(SellerService.name);
+
   constructor(
     @Inject(SELLER_REPOSITORY)
     private readonly sellerRepository: ISellerRepository,
@@ -52,6 +55,10 @@ export class SellerService {
       isOpen: createSellerDto.isOpen ?? false,
     });
 
+    this.logger.log(
+      `Registered new restaurant "${seller.name}" (id: ${seller.id}) for owner: ${ownerId}`,
+    );
+
     return seller;
   }
 
@@ -84,6 +91,10 @@ export class SellerService {
     if (!updated) {
       throw new NotFoundException('Failed to update seller status');
     }
+
+    this.logger.log(
+      `Restaurant "${seller.name}" (${seller.id}) status toggled to: ${newStatus ? 'OPEN' : 'CLOSED'}`,
+    );
 
     return updated;
   }
@@ -130,6 +141,10 @@ export class SellerService {
     if (!updated) {
       throw new NotFoundException('Failed to update seller profile');
     }
+
+    this.logger.log(
+      `Restaurant "${seller.name}" (${seller.id}) profile updated successfully`,
+    );
 
     return updated;
   }

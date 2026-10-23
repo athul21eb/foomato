@@ -22,7 +22,7 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  @Post(['', 'add'])
+  @Post()
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Item added to cart')
   async addToCart(
@@ -33,7 +33,7 @@ export class CartController {
     return { cartItem };
   }
 
-  @Get(['', 'all'])
+  @Get()
   @ResponseMessage('Cart fetched successfully')
   async getMyCart(@CurrentUser('id') userId: string) {
     return this.cartService.getMyCart(userId);
@@ -81,7 +81,7 @@ export class CartController {
     return { removed: true };
   }
 
-  @Delete(['', 'clear'])
+  @Delete()
   @ResponseMessage('Cart cleared successfully')
   async clearCart(@CurrentUser('id') userId: string) {
     await this.cartService.clearCart(userId);

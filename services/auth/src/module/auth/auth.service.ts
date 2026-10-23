@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -19,6 +20,8 @@ export interface AuthTokensResult {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -45,6 +48,7 @@ export class AuthService {
         email: loginDto.email,
         image: loginDto.picture ?? loginDto.image ?? '',
       });
+      this.logger.log(`Created new user record for: ${loginDto.email}`);
     }
 
     const tokens = await this.generateTokensForUser(user);
@@ -65,10 +69,12 @@ export class AuthService {
     if (!user) {
       user = await this.usersService.findByEmail(googlePayload.email);
       if (user) {
-        user = await this.usersService.update(user.id, {
+        const userId = user.id;
+        user = await this.usersService.update(userId, {
           googleId: googlePayload.googleId,
           image: user.image || googlePayload.picture,
         });
+        this.logger.log(`Linked existing user ${userId} with Google account`);
       } else {
         user = await this.usersService.create({
           name: googlePayload.name,
@@ -76,10 +82,16 @@ export class AuthService {
           image: googlePayload.picture,
           googleId: googlePayload.googleId,
         });
+        this.logger.log(
+          `Registered new user via Google: ${googlePayload.email}`,
+        );
       }
     }
 
     if (!user) {
+      this.logger.error(
+        `Failed to find or create user account for Google ID: ${googlePayload.googleId}`,
+      );
       throw new NotFoundException('Failed to process user account');
     }
 
@@ -100,6 +112,7 @@ export class AuthService {
     });
 
     if (!updatedUser) {
+      this.logger.warn(`Role update failed - user ${userId} not found`);
       throw new NotFoundException('User not found');
     }
 
@@ -118,11 +131,15 @@ export class AuthService {
         refreshToken,
       );
     } catch {
+      this.logger.warn('Refresh token verification failed');
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
     const user = await this.usersService.findById(payload.sub);
     if (!user) {
+      this.logger.warn(
+        `Refresh token rejected: user ${payload.sub} no longer exists`,
+      );
       throw new UnauthorizedException('User no longer exists');
     }
 

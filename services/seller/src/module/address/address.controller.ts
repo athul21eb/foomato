@@ -23,7 +23,7 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 export class AddressController {
   constructor(private readonly addressService: AddressService) {}
 
-  @Post(['', 'new'])
+  @Post('new')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Address added successfully')
   async addAddress(
@@ -34,14 +34,14 @@ export class AddressController {
     return { address };
   }
 
-  @Get(['', 'all'])
+  @Get('all')
   @ResponseMessage('Addresses fetched successfully')
   async getMyAddresses(@CurrentUser('id') userId: string) {
     const addresses = await this.addressService.getMyAddresses(userId);
     return { addresses };
   }
 
-  @Put([':id', 'edit/:id'])
+  @Put(':id')
   @ResponseMessage('Address updated successfully')
   async updateAddress(
     @CurrentUser('id') userId: string,
@@ -52,7 +52,7 @@ export class AddressController {
     return { address };
   }
 
-  @Patch([':id/default', 'default/:id'])
+  @Patch(':id/default')
   @ResponseMessage('Default address updated successfully')
   async setDefaultAddress(
     @CurrentUser('id') userId: string,

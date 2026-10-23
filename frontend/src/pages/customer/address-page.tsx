@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Home } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ChevronRight, Home, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../../context/use-auth';
 import { LoadingScreen } from '../../components/feedback/loading-screen';
 import { AddressManager } from '../../features/customer/components/address-manager';
@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 export const AddressPage: React.FC = () => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
 
   // Auth Guard
   useEffect(() => {
@@ -53,13 +55,23 @@ export const AddressPage: React.FC = () => {
             </span>
           </div>
 
-          <Link
-            to="/account"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Account</span>
-          </Link>
+          {returnTo ? (
+            <Link
+              to={returnTo}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 transition-all cursor-pointer"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>Return to Checkout</span>
+            </Link>
+          ) : (
+            <Link
+              to="/account"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Account</span>
+            </Link>
+          )}
         </div>
 
         {/* Address Manager Container */}

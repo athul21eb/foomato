@@ -43,6 +43,9 @@ export type OrderDocument = HydratedDocument<Order>;
 
 @Schema({ timestamps: true })
 export class Order {
+  @Prop({ type: String, unique: true, sparse: true, index: true })
+  orderNumber?: string;
+
   @Prop({ required: true, index: true })
   userId: string;
 
@@ -110,6 +113,9 @@ export class Order {
     index: true,
   })
   paymentStatus: PaymentStatus;
+
+  @Prop({ type: String, default: null })
+  reason?: string | null;
 
   @Prop({ type: Date, default: null })
   expiresAt?: Date | null;

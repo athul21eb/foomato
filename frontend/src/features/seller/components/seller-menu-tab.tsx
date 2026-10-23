@@ -12,13 +12,12 @@ import {
   Trash2,
   X,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
   AlertTriangle,
   Upload,
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
+import { Pagination } from '../../../components/ui/pagination';
 import { toast } from 'sonner';
 import {
   useUploadImageMutation,
@@ -33,6 +32,7 @@ import {
 } from '../schemas/seller.schema';
 import type { MenuItem } from '../types/seller.types';
 import { formatCurrency, getCurrencySymbol } from '../../../lib/utils';
+import { CardRevealStagger, CardRevealItem } from '../../../lib/animations';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -262,7 +262,7 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
             setFileError('');
             setIsAddModalOpen(true);
           }}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20 hover:brightness-110 active:scale-98 transition-all cursor-pointer shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-linear-to-r from-orange-500 to-amber-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20 hover:brightness-110 active:scale-98 transition-all cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Add Menu Item</span>
@@ -338,8 +338,9 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
         </div>
       ) : paginatedItems.length > 0 ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardRevealStagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginatedItems.map((item) => (
+              <CardRevealItem key={item.id}>
               <div
                 key={item.id}
                 className={`rounded-3xl border transition-all duration-200 overflow-hidden flex flex-col justify-between bg-white dark:bg-zinc-900 shadow-xs hover:shadow-md ${
@@ -356,7 +357,7 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
                       alt={item.name}
                       className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
 
                     {/* Veg / Non-Veg Icon */}
                     <div className="absolute top-3 left-3 flex items-center">
@@ -429,64 +430,19 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </CardRevealItem>
+          ))}
+        </CardRevealStagger>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                Showing{' '}
-                <strong className="text-zinc-900 dark:text-white">
-                  {(safePage - 1) * ITEMS_PER_PAGE + 1}
-                </strong>{' '}
-                to{' '}
-                <strong className="text-zinc-900 dark:text-white">
-                  {Math.min(safePage * ITEMS_PER_PAGE, filteredItems.length)}
-                </strong>{' '}
-                of{' '}
-                <strong className="text-zinc-900 dark:text-white">
-                  {filteredItems.length}
-                </strong>{' '}
-                dishes
-              </span>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={safePage === 1}
-                  onClick={() => handlePageChange(safePage - 1)}
-                  className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={() => handlePageChange(pageNum)}
-                    className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      pageNum === safePage
-                        ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-                        : 'border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  disabled={safePage === totalPages}
-                  onClick={() => handlePageChange(safePage + 1)}
-                  className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Reusable Common Pagination Component */}
+          <Pagination
+            currentPage={safePage}
+            totalPages={totalPages}
+            totalItems={filteredItems.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="dishes"
+            onPageChange={handlePageChange}
+          />
         </div>
       ) : (
         /* Empty State */
@@ -809,7 +765,7 @@ export const SellerMenuTab: React.FC<SellerMenuTabProps> = ({ seller }) => {
                 <button
                   type="submit"
                   disabled={isSavingItem}
-                  className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-110 active:scale-95 text-white shadow-md shadow-orange-500/20 transition-all cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-linear-to-r from-orange-500 to-amber-500 hover:brightness-110 active:scale-95 text-white shadow-md shadow-orange-500/20 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSavingItem ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

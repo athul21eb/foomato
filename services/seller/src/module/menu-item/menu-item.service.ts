@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Types } from 'mongoose';
@@ -17,6 +18,8 @@ import { SellerService } from '../seller/seller.service';
 
 @Injectable()
 export class MenuItemService {
+  private readonly logger = new Logger(MenuItemService.name);
+
   constructor(
     @Inject(MENU_ITEM_REPOSITORY)
     private readonly menuItemRepository: IMenuItemRepository,
@@ -42,6 +45,10 @@ export class MenuItemService {
       isVeg: createMenuItemDto.isVeg ?? true,
       isAvailable: createMenuItemDto.isAvailable ?? true,
     });
+
+    this.logger.log(
+      `Added menu item "${menuItem.name}" (id: ${menuItem.id}) for seller ${seller.id} (Price: ₹${menuItem.price})`,
+    );
 
     return menuItem;
   }
@@ -86,6 +93,7 @@ export class MenuItemService {
       throw new NotFoundException('Failed to delete menu item');
     }
 
+    this.logger.log(`Deleted menu item ${itemId} from seller ${seller.id}`);
     return true;
   }
 
@@ -125,6 +133,10 @@ export class MenuItemService {
     if (!updated) {
       throw new NotFoundException('Failed to update menu item status');
     }
+
+    this.logger.log(
+      `Menu item "${item.name}" (${itemId}) availability set to: ${newStatus ? 'IN_STOCK' : 'OUT_OF_STOCK'}`,
+    );
 
     return updated;
   }

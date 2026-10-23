@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { validateEnv } from './config/env.validation';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './lib/database/database.module';
@@ -13,6 +14,7 @@ import { AuthModule } from './module/auth/auth.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
     DatabaseModule,
     JwtModule,
