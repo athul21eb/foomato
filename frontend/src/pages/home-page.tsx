@@ -151,7 +151,7 @@ export const HomePage: React.FC = () => {
             {/* Hero Title */}
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight max-w-4xl leading-[1.08] mb-6">
               Craving Flavor?{" "}
-              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-orange-500 via-amber-500 to-red-500 bg-clip-text text-transparent">
                 Foomato
               </span>{" "}
               Delivers Instantly.
@@ -183,7 +183,7 @@ export const HomePage: React.FC = () => {
                   `Active Location: ${locationState.formattedAddress} (Click to view on popup)`
                 : "Click to detect browser GPS location"
               }
-              className="flex items-center gap-2.5 px-3 py-2 w-full sm:w-auto border-b sm:border-b-0 sm:border-r border-zinc-500/20 rounded-xl hover:bg-orange-500/10 transition-colors text-left group cursor-pointer shrink-0 max-w-full sm:max-w-[210px]"
+              className="flex items-center gap-2.5 px-3 py-2 w-full sm:w-auto border-b sm:border-b-0 sm:border-r border-zinc-500/20 rounded-xl hover:bg-orange-500/10 transition-colors text-left group cursor-pointer shrink-0 max-w-full sm:max-w-52.5"
             >
               {locationState.status === "loading" ?
                 <Loader2 className="w-4 h-4 text-orange-500 animate-spin shrink-0" />

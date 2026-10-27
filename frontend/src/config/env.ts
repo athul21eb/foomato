@@ -13,6 +13,10 @@ export const ENV = {
     "VITE_SELLER_API_URL",
     import.meta.env.VITE_SELLER_API_URL,
   ),
+  RIDER_API_URL: getRequiredEnv(
+    "VITE_RIDER_API_URL",
+    import.meta.env.VITE_RIDER_API_URL,
+  ),
   UTILS_API_URL: getRequiredEnv(
     "VITE_UTILS_API_URL",
     import.meta.env.VITE_UTILS_API_URL,

@@ -68,7 +68,7 @@ export const SellerProfileView: React.FC<SellerProfileViewProps> = ({
           <img
             src={seller.image}
             alt={seller.name}
-            className="w-full h-full object-cover object-center filter brightness-90 group-hover:scale-102 transition-transform duration-700"
+            className={`w-full ${seller.isOpen ? "grayscale-0" : "grayscale-100" } h-full object-cover object-center filter brightness-90 group-hover:scale-102 transition-transform duration-700`}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
 

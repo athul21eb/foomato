@@ -14,6 +14,7 @@ import {
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { GetMyOrdersDto } from './dto/get-my-orders.dto';
 import { GetOrderForPaymentDto } from './dto/get-order-for-payment.dto';
 import { GetSellerOrdersDto } from './dto/get-seller-orders.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -75,9 +76,11 @@ export class OrderController {
   @Get('my-orders')
   @UseGuards(AuthGuard)
   @ResponseMessage('User orders fetched successfully')
-  async getMyOrders(@CurrentUser('id') userId: string) {
-    const orders = await this.orderService.getMyOrders(userId);
-    return { orders };
+  async getMyOrders(
+    @CurrentUser('id') userId: string,
+    @Query() query: GetMyOrdersDto,
+  ) {
+    return this.orderService.getMyOrders(userId, query);
   }
 
   @Get('seller')

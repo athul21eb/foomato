@@ -11,6 +11,7 @@ import { ClearCredentials, SetCheckingAuth } from "../slices/auth/authSlice";
 import { apiSlice } from "../app/api/auth/authenticationApiSlice";
 import { sellerApiSlice } from "../slices/seller/sellerApiSlice";
 import { cartApiSlice } from "../slices/cart/cartApiSlice";
+import { orderApiSlice } from "../slices/order/orderApiSlice";
 import { clearCart } from "../slices/cart/cartSlice";
 import { AuthContext } from "./use-auth";
 
@@ -57,17 +58,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = async (): Promise<void> => {
     setIsLoggingOut(true);
+    const role = user?.role;
     try {
-      // 1. Immediately wipe local auth credentials synchronously to prevent any bounce/redirect glitch
+      // 1. Role-specific pre-logout cleanup (close store if seller)
+      if (role === "seller") {
+        try {
+          await dispatch(
+            sellerApiSlice.endpoints.updateSellerStatus.initiate({ isOpen: false }),
+          ).unwrap();
+        } catch {
+          // Ignore failures (e.g. seller not yet registered or network issues)
+        }
+      }
+
+      // 2. Immediately wipe local auth credentials synchronously to prevent any bounce/redirect glitch
       dispatch(ClearCredentials());
 
-      // 2. Clear RTK Query caches & cart
+      // 3. Clear global auth & orders cache
       dispatch(apiSlice.util.resetApiState());
-      dispatch(sellerApiSlice.util.resetApiState());
-      dispatch(cartApiSlice.util.resetApiState());
-      dispatch(clearCart());
+      dispatch(orderApiSlice.util.resetApiState());
 
-      // 3. Tell backend to clear the httpOnly refreshToken cookie
+      // 4. Role-scoped domain cache & state cleanup
+      if (role === "seller") {
+        dispatch(sellerApiSlice.util.resetApiState());
+      } else if (role === "customer") {
+        dispatch(cartApiSlice.util.resetApiState());
+        dispatch(clearCart());
+      }
+
+      // 5. Tell backend to clear the httpOnly refreshToken cookie
       await logoutMutation().unwrap();
     } catch {
       // Ignore network errors on logout

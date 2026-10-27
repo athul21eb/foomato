@@ -24,7 +24,7 @@ export type SellerDashboardTab = 'profile' | 'menu' | 'orders';
 export const SellerDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: seller, isLoading, isError, error } = useGetMySellerQuery();
-  const [activeTab, setActiveTab] = useState<SellerDashboardTab>('orders');
+  const [activeTab, setActiveTab] = useState<SellerDashboardTab>('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Initialize Realtime WebSocket & Audio Chimes at dashboard level so alerts are never missed

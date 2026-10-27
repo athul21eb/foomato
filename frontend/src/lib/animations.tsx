@@ -488,3 +488,373 @@ export const AnimatedStatusTab: React.FC<AnimatedStatusTabProps> = ({
     </motion.button>
   );
 };
+
+/**
+ * 14. AnimatedDetailTransition — Smooth slide-in and fade transition when viewing order details inside a tab.
+ */
+export const AnimatedDetailTransition: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 18 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -18 }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 15. AnimatedStepItem — Micro-animated milestone stepper element with scale hover and entrance.
+ */
+export const AnimatedStepItem: React.FC<{
+  children: React.ReactNode;
+  isCurrent?: boolean;
+  delay?: number;
+  className?: string;
+}> = ({ children, delay = 0, className = '' }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32, delay, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ scale: 1.02 }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 16. AnimatedReceiptRow — Staggered itemized dish rows in receipts.
+ */
+export const AnimatedReceiptRow: React.FC<{
+  children: React.ReactNode;
+  index?: number;
+  className?: string;
+}> = ({ children, index = 0, className = '' }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.24,
+        delay: Math.min(index * 0.03, 0.2),
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 17. AnimatedLivePulseBadge — Gently pulsing ambient container for live tracking indicators.
+ */
+export const AnimatedLivePulseBadge: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => {
+  return (
+    <motion.div
+      animate={{ scale: [1, 1.015, 1] }}
+      transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 18. AnimatedDutyBeacon — Radar ping ripple aura around live GPS / duty status indicators.
+ */
+export const AnimatedDutyBeacon: React.FC<{
+  children: React.ReactNode;
+  active?: boolean;
+  color?: string; // Tailwind color e.g. "bg-emerald-500"
+  className?: string;
+}> = ({ children, active = false, color = 'bg-emerald-500', className = '' }) => {
+  return (
+    <div className={`relative inline-flex items-center justify-center ${className}`}>
+      {active && (
+        <>
+          <motion.span
+            className={`absolute inset-0 rounded-full ${color} opacity-40 pointer-events-none`}
+            initial={{ scale: 1, opacity: 0.6 }}
+            animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
+            transition={{
+              duration: 1.8,
+              repeat: Infinity,
+              ease: 'easeOut',
+            }}
+          />
+          <motion.span
+            className={`absolute inset-0 rounded-full ${color} opacity-30 pointer-events-none`}
+            initial={{ scale: 1, opacity: 0.4 }}
+            animate={{ scale: [1, 1.7], opacity: [0.4, 0] }}
+            transition={{
+              duration: 1.8,
+              delay: 0.5,
+              repeat: Infinity,
+              ease: 'easeOut',
+            }}
+          />
+        </>
+      )}
+      <div className="relative z-10">{children}</div>
+    </div>
+  );
+};
+
+/**
+ * 19. AnimatedGlowContainer — Ambient breathing container glow for active duty or hero surfaces.
+ */
+export const AnimatedGlowContainer: React.FC<{
+  children: React.ReactNode;
+  active?: boolean;
+  className?: string;
+  glowColor?: string; // hex or rgba
+}> = ({
+  children,
+  active = false,
+  className = '',
+  glowColor = 'rgba(16, 185, 129, 0.18)',
+}) => {
+  return (
+    <motion.div
+      animate={
+        active
+          ? {
+              boxShadow: [
+                `0 0 0 1px rgba(16,185,129,0.25), 0 10px 25px -5px ${glowColor}`,
+                `0 0 0 1px rgba(16,185,129,0.45), 0 15px 35px -5px ${glowColor}`,
+                `0 0 0 1px rgba(16,185,129,0.25), 0 10px 25px -5px ${glowColor}`,
+              ],
+            }
+          : {
+              boxShadow: '0 0 0 1px rgba(0,0,0,0)',
+            }
+      }
+      transition={{
+        duration: 2.8,
+        repeat: active ? Infinity : 0,
+        ease: 'easeInOut',
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 20. AnimatedShimmerBadge — Polished badge with specular shine sweep effect.
+ */
+export const AnimatedShimmerBadge: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => {
+  return (
+    <div className={`relative overflow-hidden inline-flex items-center ${className}`}>
+      {children}
+      <motion.div
+        className="absolute inset-0 -translate-x-full pointer-events-none bg-linear-to-r from-transparent via-white/25 to-transparent skew-x-12"
+        animate={{ translateX: ['-100%', '200%'] }}
+        transition={{
+          duration: 2.4,
+          repeat: Infinity,
+          repeatDelay: 3.5,
+          ease: 'easeInOut',
+        }}
+      />
+    </div>
+  );
+};
+
+/**
+ * 21. AnimatedBentoStatCard — Spring-elevated stat card with fluid hover dynamics.
+ */
+export const AnimatedBentoStatCard: React.FC<{
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}> = ({ children, delay = 0, className = '' }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{
+        duration: 0.38,
+        delay,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      whileHover={{
+        y: -4,
+        scale: 1.015,
+        transition: { duration: 0.2, ease: 'easeOut' },
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 22. AnimatedNumberTicker — Smooth numeric counting animation for metrics & stats.
+ */
+export const AnimatedNumberTicker: React.FC<{
+  value: number;
+  direction?: 'up' | 'down';
+  decimals?: number;
+  suffix?: string;
+  prefix?: string;
+  className?: string;
+}> = ({
+  value,
+  decimals = 0,
+  suffix = '',
+  prefix = '',
+  className = '',
+}) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const motionVal = useMotionValue(0);
+  const isInView = useInView(ref, { once: true, margin: '-20px' });
+
+  useEffect(() => {
+    if (!isInView) return;
+    const controls = animate(motionVal, value, {
+      duration: 1.2,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (latest) => {
+        if (ref.current) {
+          ref.current.textContent = `${prefix}${latest.toFixed(decimals)}${suffix}`;
+        }
+      },
+    });
+    return () => controls.stop();
+  }, [isInView, value, decimals, prefix, suffix, motionVal]);
+
+  return (
+    <span ref={ref} className={className}>
+      {prefix}
+      {value.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
+};
+
+/**
+ * 23. AnimatedTabContent — Smooth fluid transition when switching between tabs.
+ */
+export const AnimatedTabContent: React.FC<{
+  children: React.ReactNode;
+  activeKey: string;
+  className?: string;
+}> = ({ children, activeKey, className = '' }) => {
+  return (
+    <motion.div
+      key={activeKey}
+      initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, y: -10, filter: 'blur(2px)' }}
+      transition={{
+        duration: 0.28,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 24. AnimatedSidebarTab — Micro-interactive sidebar button with active pill backdrop.
+ */
+export const AnimatedSidebarTab: React.FC<{
+  children: React.ReactNode;
+  isActive: boolean;
+  onClick: () => void;
+  className?: string;
+}> = ({ children, isActive, onClick, className = '' }) => {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileHover={{ scale: 1.01, x: 2 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      className={`relative w-full text-left cursor-pointer select-none transition-colors ${className}`}
+    >
+      {isActive && (
+        <motion.div
+          layoutId="riderActiveSidebarTab"
+          className="absolute inset-0 rounded-2xl bg-linear-to-r from-orange-500 to-amber-500 shadow-md shadow-orange-500/25 -z-10"
+          transition={{
+            type: 'spring',
+            stiffness: 380,
+            damping: 32,
+          }}
+        />
+      )}
+      {children}
+    </motion.button>
+  );
+};
+
+/**
+ * 25. AnimatedLockBadge — Subtle floating/pulsing lock badge for restricted features.
+ */
+export const AnimatedLockBadge: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => {
+  return (
+    <motion.div
+      animate={{
+        y: [0, -3, 0],
+      }}
+      transition={{
+        duration: 2.8,
+        repeat: Infinity,
+        ease: 'easeInOut',
+      }}
+      className={`inline-flex items-center ${className}`}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 26. AnimatedVerificationCard — Glowing attention card for verification-in-progress screens.
+ */
+export const AnimatedVerificationCard: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96, y: 16 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{
+        duration: 0.45,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+

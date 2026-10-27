@@ -36,7 +36,7 @@ export const SellerCard: React.FC<SellerCardProps> = ({ seller }) => {
           src={seller.image}
           alt={seller.name}
           loading="lazy"
-          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500 filter brightness-95"
+          className={`h-full ${seller.isOpen ? "grayscale-0" : "grayscale-100" }  w-full object-cover object-center group-hover:scale-105 transition-transform duration-500 filter brightness-95`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 

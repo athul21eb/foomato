@@ -117,11 +117,16 @@ export const sellerApiSlice = createApi({
     }),
 
     uploadImage: builder.mutation<UploadResponse, FormData>({
-      query: (formData) => ({
-        url: `${UTILS_API_URL}/upload`,
-        method: 'POST',
-        body: formData,
-      }),
+      query: (formData) => {
+        if (!formData.has('folder')) {
+          formData.append('folder', 'foomato/seller');
+        }
+        return {
+          url: `${UTILS_API_URL}/upload`,
+          method: 'POST',
+          body: formData,
+        };
+      },
       transformResponse: (response: ApiResponse<UploadResponse>) =>
         response.data,
     }),

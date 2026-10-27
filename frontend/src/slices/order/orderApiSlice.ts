@@ -10,6 +10,7 @@ import type { ApiResponse } from '../../types/api';
 import type {
   CreateOrderPayload,
   CreateOrderResult,
+  CustomerOrdersResponse,
   OrderDetails,
   SellerOrdersResponse,
 } from '../../features/checkout/types/checkout.types';
@@ -74,10 +75,17 @@ export const orderApiSlice = createApi({
       providesTags: (_result, _error, id) => [{ type: 'Order', id }],
     }),
 
-    getMyOrders: builder.query<OrderDetails[], void>({
-      query: () => '/order/my-orders',
-      transformResponse: (response: ApiResponse<{ orders: OrderDetails[] }>) =>
-        response.data.orders,
+    getMyOrders: builder.query<
+      CustomerOrdersResponse,
+      { page?: number; limit?: number; tab?: string } | void
+    >({
+      query: (params) => ({
+        url: '/order/my-orders',
+        params: params || {},
+      }),
+      transformResponse: (
+        response: ApiResponse<CustomerOrdersResponse>,
+      ) => response.data,
       providesTags: ['Order'],
     }),
 

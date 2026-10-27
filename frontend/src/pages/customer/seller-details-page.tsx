@@ -241,8 +241,13 @@ export const SellerDetailsPage: React.FC = () => {
                         {item.description}
                       </p>
                     )}
+                    {!seller.isOpen && (
+                      <span className="inline-block mt-2 text-[10px] font-bold uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">
+                        Closed
+                      </span>
+                    )}
 
-                    {!item.isAvailable && (
+                    {seller.isOpen && !item.isAvailable && (
                       <span className="inline-block mt-2 text-[10px] font-bold uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">
                         Currently Sold Out
                       </span>

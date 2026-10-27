@@ -129,6 +129,7 @@ export const AddSellerPage: React.FC = () => {
       // 1. Upload image to Utils service (port 5002)
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('folder', 'foomato/seller');
       const uploadResult = await uploadImage(formData).unwrap();
 
       // 2. Create Seller profile in Seller service (port 5001)
@@ -274,7 +275,7 @@ export const AddSellerPage: React.FC = () => {
 
               {/* Simulated Restaurant Card */}
               <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 overflow-hidden shadow-sm">
-                <div className="relative h-28 bg-gradient-to-r from-orange-500/20 to-amber-500/20 overflow-hidden">
+                <div className="relative h-28 bg-linear-to-r from-orange-500/20 to-amber-500/20 overflow-hidden">
                   {imagePreview ? (
                     <img
                       src={imagePreview}
@@ -489,7 +490,7 @@ export const AddSellerPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 text-white font-extrabold text-base shadow-xl shadow-orange-500/25 hover:brightness-110 active:scale-99 transition-all cursor-pointer disabled:opacity-60"
+                  className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-linear-to-r from-orange-500 via-amber-500 to-red-500 text-white font-extrabold text-base shadow-xl shadow-orange-500/25 hover:brightness-110 active:scale-99 transition-all cursor-pointer disabled:opacity-60"
                 >
                   {isSubmitting ? (
                     <>

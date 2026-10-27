@@ -224,11 +224,13 @@ export const Footer: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  // Remove footer entirely for seller and rider roles, as well as on seller and rider portal routes
+  // Remove footer entirely for seller/rider portals and customer account/order dashboard views
   if (
     (isAuthenticated && (user?.role === 'seller' || user?.role === 'rider')) ||
     location.pathname.startsWith('/seller') ||
-    location.pathname.startsWith('/rider')
+    location.pathname.startsWith('/rider') ||
+    location.pathname.startsWith('/account') ||
+    location.pathname.startsWith('/order/')
   ) {
     return null;
   }

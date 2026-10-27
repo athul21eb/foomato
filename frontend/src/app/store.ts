@@ -8,6 +8,7 @@ import { cartApiSlice } from '../slices/cart/cartApiSlice';
 import { addressApiSlice } from '../slices/address/addressApiSlice';
 import { orderApiSlice } from '../slices/order/orderApiSlice';
 import { paymentApiSlice } from '../slices/payment/paymentApiSlice';
+import { riderApiSlice } from '../slices/rider/riderApiSlice';
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     [addressApiSlice.reducerPath]: addressApiSlice.reducer,
     [orderApiSlice.reducerPath]: orderApiSlice.reducer,
     [paymentApiSlice.reducerPath]: paymentApiSlice.reducer,
+    [riderApiSlice.reducerPath]: riderApiSlice.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
@@ -28,7 +30,8 @@ export const store = configureStore({
       .concat(cartApiSlice.middleware)
       .concat(addressApiSlice.middleware)
       .concat(orderApiSlice.middleware)
-      .concat(paymentApiSlice.middleware),
+      .concat(paymentApiSlice.middleware)
+      .concat(riderApiSlice.middleware),
   devTools: true,
 });
 

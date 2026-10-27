@@ -14,6 +14,7 @@ import {
 } from './interfaces/order.repository.interface';
 import { OrderEntity, OrderStatus, PaymentStatus } from './domain/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { GetMyOrdersDto } from './dto/get-my-orders.dto';
 import { GetSellerOrdersDto } from './dto/get-seller-orders.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CartService } from '../cart/cart.service';
@@ -250,8 +251,43 @@ export class OrderService {
     };
   }
 
-  async getMyOrders(userId: string): Promise<OrderEntity[]> {
-    return this.orderRepository.findByUserId(userId);
+  async getMyOrders(
+    userId: string,
+    query: GetMyOrdersDto,
+  ): Promise<{
+    orders: OrderEntity[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    counts: {
+      all: number;
+      inProgress: number;
+      delivered: number;
+      cancelled: number;
+    };
+  }> {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const tab = query.tab || 'all';
+
+    const { orders, total, counts } = await this.orderRepository.findUserOrders(
+      userId,
+      page,
+      limit,
+      tab,
+    );
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    return {
+      orders,
+      total,
+      page,
+      limit,
+      totalPages,
+      counts,
+    };
   }
 
   async getRestaurantOrders(restaurantId: string): Promise<OrderEntity[]> {

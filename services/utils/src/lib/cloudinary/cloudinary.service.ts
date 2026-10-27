@@ -51,8 +51,13 @@ export class CloudinaryService implements OnModuleInit {
         ...options,
       });
       return response;
-    } catch (error) {
-      this.logger.error('Failed to upload data URI to Cloudinary', error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Failed to upload data URI to Cloudinary in folder "${folder}": ${message}`,
+        stack,
+      );
       throw new InternalServerErrorException(
         'Failed to upload image to Cloudinary',
       );

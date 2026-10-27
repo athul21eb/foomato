@@ -4,6 +4,7 @@ import { RootLayout } from '../layouts/root-layout';
 import { ErrorPage } from '../pages/error-page';
 import { LoadingScreen } from '../components/feedback/loading-screen';
 import { sellerRoutes } from '../features/seller/seller.routes';
+import { riderRoutes } from '../features/rider/rider.routes';
 import { authRoutes } from '../features/auth/auth.routes';
 
 // Lazy-loaded page components for customer & fallback routes
@@ -43,6 +44,11 @@ const PaymentFailedPage = lazy(() =>
 const SellerDetailsPage = lazy(() =>
   import('../pages/customer/seller-details-page').then((m) => ({
     default: m.SellerDetailsPage,
+  })),
+);
+const OrderDetailsPage = lazy(() =>
+  import('../pages/customer/order-details-page').then((m) => ({
+    default: m.OrderDetailsPage,
   })),
 );
 const NotFoundPage = lazy(() =>
@@ -105,6 +111,10 @@ export const router = createBrowserRouter([
         element: withSuspense(CustomerAccountPage),
       },
       {
+        path: 'order/:id',
+        element: withSuspense(OrderDetailsPage),
+      },
+      {
         path: 'address',
         element: withSuspense(AddressPage),
       },
@@ -118,6 +128,7 @@ export const router = createBrowserRouter([
       },
       // Modular Feature Sub-Trees
       sellerRoutes,
+      riderRoutes,
     ],
   },
 

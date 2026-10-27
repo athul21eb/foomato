@@ -242,4 +242,82 @@ export class MongooseOrderRepository implements IOrderRepository {
       .exec();
     return this.toDomain(doc);
   }
+
+  async findUserOrders(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    tab: string = 'all',
+  ): Promise<{
+    orders: OrderEntity[];
+    total: number;
+    counts: {
+      all: number;
+      inProgress: number;
+      delivered: number;
+      cancelled: number;
+    };
+  }> {
+    const IN_PROGRESS_STATUSES: readonly string[] = [
+      OrderStatus.PLACED,
+      OrderStatus.ACCEPTED,
+      OrderStatus.PREPARING,
+      OrderStatus.READY_FOR_RIDER,
+      OrderStatus.RIDER_ASSIGNED,
+      OrderStatus.PICKED_UP,
+    ];
+
+    const filter: Record<string, unknown> = { userId };
+    if (tab === 'in_progress') {
+      filter.status = { $in: IN_PROGRESS_STATUSES };
+    } else if (tab === 'delivered') {
+      filter.status = OrderStatus.DELIVERED;
+    } else if (tab === 'cancelled') {
+      filter.status = OrderStatus.CANCELLED;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [docs, total, aggCounts] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments(filter).exec(),
+      this.orderModel.aggregate([
+        { $match: { userId } },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const counts = {
+      all: 0,
+      inProgress: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+
+    let totalAll = 0;
+    for (const item of aggCounts as Array<{ _id: string; count: number }>) {
+      if (item._id && typeof item.count === 'number') {
+        totalAll += item.count;
+        if (IN_PROGRESS_STATUSES.includes(item._id)) {
+          counts.inProgress += item.count;
+        } else if (item._id === OrderStatus.DELIVERED) {
+          counts.delivered += item.count;
+        } else if (item._id === OrderStatus.CANCELLED) {
+          counts.cancelled += item.count;
+        }
+      }
+    }
+    counts.all = totalAll;
+
+    const orders = docs
+      .map((doc) => this.toDomain(doc))
+      .filter((order): order is OrderEntity => order !== null);
+
+    return { orders, total, counts };
+  }
 }

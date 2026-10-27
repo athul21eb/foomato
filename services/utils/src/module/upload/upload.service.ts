@@ -22,7 +22,8 @@ export class UploadService {
     file?: Express.Multer.File,
     dto?: UploadImageDto,
   ): Promise<UploadResult> {
-    const folder = dto?.folder || 'foomato';
+    const rawFolder = dto?.folder?.trim();
+    const folder = rawFolder ? rawFolder.replace(/^\/+|\/+$/g, '') : 'foomato';
 
     // 1. If multipart file is uploaded via Multer
     if (file) {

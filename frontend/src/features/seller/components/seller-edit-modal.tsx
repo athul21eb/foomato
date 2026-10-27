@@ -155,6 +155,7 @@ export const SellerEditModal: React.FC<SellerEditModalProps> = ({
       if (selectedFile) {
         const formData = new FormData();
         formData.append('file', selectedFile);
+        formData.append('folder', 'foomato/seller');
         const uploadRes = await uploadImage(formData).unwrap();
         finalImageUrl = uploadRes.url;
       }
@@ -188,15 +189,15 @@ export const SellerEditModal: React.FC<SellerEditModalProps> = ({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-lg md:max-w-4xl lg:max-w-5xl md:h-[600px] max-h-[92vh] rounded-3xl bg-white/95 dark:bg-zinc-900/95 border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+          className="relative w-full max-w-lg md:max-w-4xl lg:max-w-5xl md:h-150 max-h-[92vh] rounded-3xl bg-white/95 dark:bg-zinc-900/95 border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
         >
           {/* Top Decorative Gradient Accent */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 shrink-0" />
+          <div className="h-1.5 w-full bg-linear-to-r from-orange-500 via-amber-500 to-red-500 shrink-0" />
 
           {/* Modal Header */}
           <div className="px-5 sm:px-6 py-3.5 flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
                 <Store className="w-5 h-5" />
               </div>
               <div>
@@ -415,7 +416,7 @@ export const SellerEditModal: React.FC<SellerEditModalProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || (!isDirty && !selectedFile && !isLocationChanged)}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-orange-500 via-amber-500 to-red-500 text-white shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-98 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-linear-to-r from-orange-500 via-amber-500 to-red-500 text-white shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-98 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>

@@ -36,4 +36,19 @@ export interface IOrderRepository {
     total: number;
     counts?: Record<string, number>;
   }>;
+  findUserOrders(
+    userId: string,
+    page: number,
+    limit: number,
+    tab?: string,
+  ): Promise<{
+    orders: OrderEntity[];
+    total: number;
+    counts: {
+      all: number;
+      inProgress: number;
+      delivered: number;
+      cancelled: number;
+    };
+  }>;
 }

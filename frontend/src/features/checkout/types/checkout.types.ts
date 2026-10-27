@@ -59,6 +59,20 @@ export interface SellerOrdersResponse {
   counts?: Record<string, number>;
 }
 
+export interface CustomerOrdersResponse {
+  orders: OrderDetails[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  counts: {
+    all: number;
+    inProgress: number;
+    delivered: number;
+    cancelled: number;
+  };
+}
+
 export interface RazorpayOrderResult {
   razorpayOrderId: string;
   amount: number;
