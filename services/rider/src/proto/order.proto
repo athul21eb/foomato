@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package order;
+
+service OrderService {
+  rpc GetOrderForPayment (GetOrderForPaymentRequest) returns (GetOrderForPaymentResponse);
+  rpc AssignRider (AssignRiderRequest) returns (AssignRiderResponse);
+  rpc GetCurrentRiderOrder (GetCurrentRiderOrderRequest) returns (RiderOrderDetailsResponse);
+  rpc UpdateOrderStatusByRider (UpdateOrderStatusByRiderRequest) returns (RiderOrderDetailsResponse);
+}
+
+message GetOrderForPaymentRequest {
+  string order_id = 1;
+}
+
+message GetOrderForPaymentResponse {
+  string order_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string payment_status = 4;
+}
+
+message AssignRiderRequest {
+  string order_id = 1;
+  string rider_id = 2;
+  string rider_name = 3;
+  string rider_phone = 4;
+}
+
+message AssignRiderResponse {
+  bool success = 1;
+  string message = 2;
+  string order_id = 3;
+  string status = 4;
+}
+
+message GetCurrentRiderOrderRequest {
+  string rider_id = 1;
+}
+
+message UpdateOrderStatusByRiderRequest {
+  string order_id = 1;
+  string rider_id = 2;
+}
+
+message RiderOrderDetailsResponse {
+  string order_id = 1;
+  string order_number = 2;
+  string restaurant_id = 3;
+  string restaurant_name = 4;
+  string status = 5;
+  double total_amount = 6;
+  double rider_amount = 7;
+  string pickup_address = 8;
+  double pickup_lat = 9;
+  double pickup_lng = 10;
+  string delivery_address = 11;
+  double delivery_lat = 12;
+  double delivery_lng = 13;
+  string customer_phone = 14;
+  string items_summary = 15;
+}

@@ -12,4 +12,8 @@ export interface IRiderRepository {
     coordinates: [number, number],
   ): Promise<RiderEntity | null>;
   update(userId: string, data: Partial<RiderEntity>): Promise<RiderEntity | null>;
+  findNearbyAvailable(
+    coordinates: [number, number],
+    maxDistanceMeters?: number,
+  ): Promise<RiderEntity[]>;
 }

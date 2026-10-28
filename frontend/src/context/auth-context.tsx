@@ -10,6 +10,7 @@ import {
 import { ClearCredentials, SetCheckingAuth } from "../slices/auth/authSlice";
 import { apiSlice } from "../app/api/auth/authenticationApiSlice";
 import { sellerApiSlice } from "../slices/seller/sellerApiSlice";
+import { riderApiSlice } from "../slices/rider/riderApiSlice";
 import { cartApiSlice } from "../slices/cart/cartApiSlice";
 import { orderApiSlice } from "../slices/order/orderApiSlice";
 import { clearCart } from "../slices/cart/cartSlice";
@@ -60,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoggingOut(true);
     const role = user?.role;
     try {
-      // 1. Role-specific pre-logout cleanup (close store if seller)
+      // 1. Role-specific pre-logout cleanup (close store if seller, go offline if rider)
       if (role === "seller") {
         try {
           await dispatch(
@@ -68,6 +69,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           ).unwrap();
         } catch {
           // Ignore failures (e.g. seller not yet registered or network issues)
+        }
+      } else if (role === "rider") {
+        try {
+          await dispatch(
+            riderApiSlice.endpoints.toggleAvailability.initiate({
+              isAvailable: false,
+              latitude: 0,
+              longitude: 0
+            }),
+          ).unwrap();
+        } catch {
+          // Ignore failures (e.g. rider not yet registered or network issues)
         }
       }
 
@@ -81,6 +94,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // 4. Role-scoped domain cache & state cleanup
       if (role === "seller") {
         dispatch(sellerApiSlice.util.resetApiState());
+      } else if (role === "rider") {
+        dispatch(riderApiSlice.util.resetApiState());
       } else if (role === "customer") {
         dispatch(cartApiSlice.util.resetApiState());
         dispatch(clearCart());

@@ -200,6 +200,7 @@ export const RiderEditModal: React.FC<RiderEditModalProps> = ({
         await updateRider({
           latitude: data.latitude,
           longitude: data.longitude,
+          formattedAddress: data.formattedAddress?.trim() || undefined,
         }).unwrap();
         toast.success('Service location updated successfully!');
       } else {
@@ -212,6 +213,7 @@ export const RiderEditModal: React.FC<RiderEditModalProps> = ({
           drivingLicenseNumber: data.drivingLicenseNumber?.trim(),
           latitude: data.latitude,
           longitude: data.longitude,
+          formattedAddress: data.formattedAddress?.trim() || undefined,
         }).unwrap();
         toast.success('Courier profile updated successfully!');
       }

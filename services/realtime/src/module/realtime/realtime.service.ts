@@ -35,6 +35,11 @@ export class RealtimeService {
     return this.gateway.emitToSeller(sellerId, event, payload);
   }
 
+  emitToRider(riderId: string, event: string, payloadJson?: string): boolean {
+    const payload = this.parsePayload(payloadJson);
+    return this.gateway.emitToRider(riderId, event, payload);
+  }
+
   broadcast(event: string, payloadJson?: string): boolean {
     const payload = this.parsePayload(payloadJson);
     return this.gateway.broadcast(event, payload);

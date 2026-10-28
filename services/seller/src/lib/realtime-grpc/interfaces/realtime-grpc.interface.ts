@@ -18,6 +18,12 @@ export interface EmitToSellerRequest {
   payloadJson: string;
 }
 
+export interface EmitToRiderRequest {
+  riderId: string;
+  event: string;
+  payloadJson: string;
+}
+
 export interface EmitResponse {
   success: boolean;
 }
@@ -27,6 +33,10 @@ export interface RealtimeGrpcService {
   emitToUser(data: EmitToUserRequest, metadata?: any): Observable<EmitResponse>;
   emitToSeller(
     data: EmitToSellerRequest,
+    metadata?: any,
+  ): Observable<EmitResponse>;
+  emitToRider(
+    data: EmitToRiderRequest,
     metadata?: any,
   ): Observable<EmitResponse>;
 }

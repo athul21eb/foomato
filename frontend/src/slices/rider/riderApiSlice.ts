@@ -56,7 +56,7 @@ const baseQueryWithReAuth: BaseQueryFn<
 export const riderApiSlice = createApi({
   reducerPath: 'riderApi',
   baseQuery: baseQueryWithReAuth,
-  tagTypes: ['Rider'],
+  tagTypes: ['Rider', 'RiderCurrentOrder'],
   endpoints: (builder) => ({
     getMyRider: builder.query<RiderProfile, void>({
       query: () => '/rider/profile',
@@ -132,6 +132,45 @@ export const riderApiSlice = createApi({
       },
       transformResponse: (response: ApiResponse<UploadResponse>) => response.data,
     }),
+
+    getCurrentOrder: builder.query<{ order: import('../../features/rider/types/rider.types').RiderCurrentOrder | null }, void>({
+      query: () => '/rider/order/current',
+      transformResponse: (
+        response: ApiResponse<{ order: import('../../features/rider/types/rider.types').RiderCurrentOrder | null }>,
+      ) => response.data,
+      providesTags: ['RiderCurrentOrder'],
+    }),
+
+    acceptOrder: builder.mutation<
+      { message: string; orderId: string; status: string },
+      { orderId: string }
+    >({
+      query: ({ orderId }) => ({
+        url: `/rider/order/${orderId}/accept`,
+        method: 'POST',
+      }),
+      transformResponse: (
+        response: ApiResponse<{ message: string; orderId: string; status: string }>,
+      ) => response.data,
+      invalidatesTags: ['RiderCurrentOrder', 'Rider'],
+    }),
+
+    updateOrderStatus: builder.mutation<
+      { message: string; order: import('../../features/rider/types/rider.types').RiderCurrentOrder },
+      { orderId: string }
+    >({
+      query: ({ orderId }) => ({
+        url: `/rider/order/${orderId}/status`,
+        method: 'PATCH',
+      }),
+      transformResponse: (
+        response: ApiResponse<{
+          message: string;
+          order: import('../../features/rider/types/rider.types').RiderCurrentOrder;
+        }>,
+      ) => response.data,
+      invalidatesTags: ['RiderCurrentOrder', 'Rider'],
+    }),
   }),
 });
 
@@ -141,4 +180,7 @@ export const {
   useUpdateRiderMutation,
   useToggleAvailabilityMutation,
   useUploadRiderImageMutation,
+  useGetCurrentOrderQuery,
+  useAcceptOrderMutation,
+  useUpdateOrderStatusMutation,
 } = riderApiSlice;

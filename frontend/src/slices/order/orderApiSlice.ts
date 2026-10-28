@@ -117,6 +117,20 @@ export const orderApiSlice = createApi({
       ) => response.data,
       invalidatesTags: ['SellerOrders', 'Order'],
     }),
+
+    retryRiderDispatch: builder.mutation<
+      { order: OrderDetails },
+      { orderId: string }
+    >({
+      query: ({ orderId }) => ({
+        url: `/order/${orderId}/dispatch-retry`,
+        method: 'POST',
+      }),
+      transformResponse: (
+        response: ApiResponse<{ order: OrderDetails }>,
+      ) => response.data,
+      invalidatesTags: ['SellerOrders'],
+    }),
   }),
 });
 
@@ -126,5 +140,6 @@ export const {
   useGetMyOrdersQuery,
   useGetSellerOrdersQuery,
   useUpdateOrderStatusMutation,
+  useRetryRiderDispatchMutation,
 } = orderApiSlice;
 

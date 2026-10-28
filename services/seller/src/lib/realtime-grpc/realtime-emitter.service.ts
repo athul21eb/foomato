@@ -91,4 +91,30 @@ export class RealtimeEmitterService implements OnModuleInit {
       return false;
     }
   }
+
+  /**
+   * Convenience helper to emit to a specific rider via gRPC
+   */
+  async emitToRider(
+    riderId: string,
+    event: string,
+    payload: unknown = {},
+  ): Promise<boolean> {
+    try {
+      const payloadJson = JSON.stringify(payload ?? {});
+      const res = await firstValueFrom(
+        this.realtimeGrpcService.emitToRider(
+          { riderId, event, payloadJson },
+          this.buildMetadata(),
+        ),
+      );
+      return res?.success ?? true;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to emit event "${event}" to rider "${riderId}": ${message}`,
+      );
+      return false;
+    }
+  }
 }

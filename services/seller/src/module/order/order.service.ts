@@ -21,6 +21,14 @@ import { CartService } from '../cart/cart.service';
 import { AddressService } from '../address/address.service';
 import { SellerService } from '../seller/seller.service';
 import { RealtimeEmitterService } from '../../lib/realtime-grpc/realtime-emitter.service';
+import { RabbitmqService } from '../../lib/rabbitmq/rabbitmq.service';
+import { ConfigService } from '@nestjs/config';
+import { RequestContext } from '../../common/context/request-context';
+import type {
+  AssignRiderGrpcDto,
+  AssignRiderResponse,
+  RiderOrderDetailsResponse,
+} from './interfaces/order-grpc.interface';
 
 export interface CreateOrderResponse {
   message: string;
@@ -46,6 +54,8 @@ export class OrderService {
     private readonly addressService: AddressService,
     private readonly sellerService: SellerService,
     private readonly realtimeEmitter: RealtimeEmitterService,
+    private readonly rabbitmqService: RabbitmqService,
+    private readonly configService: ConfigService,
   ) {}
 
   private getDistanceKm(
@@ -467,6 +477,293 @@ export class OrderService {
       );
     }
 
+    // Notify rider network when order is packed and ready for delivery
+    if (targetStatus === OrderStatus.READY_FOR_RIDER) {
+      const orderReadyQueue =
+        this.configService.getOrThrow<string>('ORDER_READY_QUEUE');
+
+      const eventPayload = {
+        type: 'ORDER_READY_FOR_RIDER',
+        data: {
+          orderId: updated.id,
+          orderNumber: updated.orderNumber,
+          restaurantId: seller.id,
+          restaurantName: seller.name,
+          location: seller.autoLocation,
+          dropoffLocation: updated.deliveryAddress,
+          totalAmount: updated.totalAmount,
+          riderAmount: updated.riderAmount,
+        },
+        correlationId: RequestContext.getCorrelationId(),
+        timestamp: new Date().toISOString(),
+      };
+
+      try {
+        await this.rabbitmqService.publish(orderReadyQueue, eventPayload);
+        this.logger.log(
+          `Published "ORDER_READY_FOR_RIDER" event to queue "${orderReadyQueue}" for order ${orderId} (#${updated.orderNumber || updated.id})`,
+        );
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `Failed to publish ORDER_READY_FOR_RIDER event for order ${orderId}: ${message}`,
+        );
+      }
+    }
+
     return updated;
+  }
+
+  async retryRiderDispatch(
+    ownerId: string,
+    orderId: string,
+  ): Promise<OrderEntity> {
+    const seller = await this.sellerService.fetchMySeller(ownerId);
+    const order = await this.orderRepository.findById(orderId);
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.restaurantId !== seller.id) {
+      throw new ForbiddenException(
+        'You are not authorized to manage orders for another restaurant',
+      );
+    }
+
+    if (order.status !== OrderStatus.READY_FOR_RIDER) {
+      throw new BadRequestException(
+        'Dispatch retry is only permitted for orders waiting for a rider (ready_for_rider)',
+      );
+    }
+
+    if (order.riderId) {
+      throw new BadRequestException(
+        'A delivery rider has already accepted this order',
+      );
+    }
+
+    const orderReadyQueue =
+      this.configService.getOrThrow<string>('ORDER_READY_QUEUE');
+
+    const eventPayload = {
+      type: 'ORDER_READY_FOR_RIDER',
+      data: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        restaurantId: seller.id,
+        restaurantName: seller.name,
+        location: seller.autoLocation,
+        dropoffLocation: order.deliveryAddress,
+        totalAmount: order.totalAmount,
+        riderAmount: order.riderAmount,
+      },
+      correlationId: RequestContext.getCorrelationId(),
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      await this.rabbitmqService.publish(orderReadyQueue, eventPayload);
+      this.logger.log(
+        `[Retry] Re-published "ORDER_READY_FOR_RIDER" event to queue "${orderReadyQueue}" for order ${orderId} (#${order.orderNumber || order.id})`,
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Failed to re-publish ORDER_READY_FOR_RIDER event for order ${orderId}: ${message}`,
+      );
+      throw new BadRequestException('Failed to dispatch notification to riders');
+    }
+
+    return order;
+  }
+
+  private async formatRiderOrderDetails(
+    order: OrderEntity,
+  ): Promise<RiderOrderDetailsResponse> {
+    const restaurant = await this.sellerService.findById(order.restaurantId);
+
+    const itemsSummary =
+      order.items
+        ?.map((i) => `${i.name} x${i.quantity ?? i.quauntity ?? 1}`)
+        .join(', ') || '';
+
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber || order.id,
+      restaurantId: order.restaurantId,
+      restaurantName: order.restaurantName || restaurant?.name || 'Restaurant',
+      status: order.status,
+      totalAmount: order.totalAmount,
+      riderAmount: order.riderAmount || 0,
+      pickupAddress: restaurant?.autoLocation?.formattedAddress || '',
+      pickupLat: restaurant?.autoLocation?.coordinates?.[1] || 0,
+      pickupLng: restaurant?.autoLocation?.coordinates?.[0] || 0,
+      deliveryAddress: order.deliveryAddress?.formattedAddress || '',
+      deliveryLat: order.deliveryAddress?.latitude || 0,
+      deliveryLng: order.deliveryAddress?.longitude || 0,
+      customerPhone: String(order.deliveryAddress?.mobile || ''),
+      itemsSummary,
+    };
+  }
+
+  async assignRiderToOrder(
+    dto: AssignRiderGrpcDto,
+  ): Promise<AssignRiderResponse> {
+    const existingActive =
+      await this.orderRepository.findCurrentActiveByRiderId(dto.riderId);
+    if (existingActive) {
+      throw new BadRequestException(
+        'You already have an active order in progress. Complete it first before accepting a new delivery.',
+      );
+    }
+
+    const assigned = await this.orderRepository.assignRiderAtomic(
+      dto.orderId,
+      dto.riderId,
+      dto.riderName,
+      dto.riderPhone,
+    );
+
+    if (!assigned) {
+      throw new BadRequestException(
+        'Order already accepted by another rider or not ready for pickup',
+      );
+    }
+
+    this.logger.log(
+      `Order ${dto.orderId} successfully assigned to rider ${dto.riderId} (${dto.riderName})`,
+    );
+
+    // Notify Customer
+    void this.realtimeEmitter.emitToUser(
+      assigned.userId,
+      'order:rider_assigned',
+      {
+        orderId: assigned.id,
+        orderNumber: assigned.orderNumber,
+        status: assigned.status,
+        riderName: assigned.riderName,
+        riderPhone: assigned.riderPhone,
+      },
+    );
+
+    // Notify Restaurant
+    void this.realtimeEmitter.emitToSeller(
+      assigned.restaurantId,
+      'order:rider_assigned',
+      {
+        orderId: assigned.id,
+        orderNumber: assigned.orderNumber,
+        status: assigned.status,
+        riderId: dto.riderId,
+        riderName: assigned.riderName,
+      },
+    );
+
+    // Notify Rider
+    void this.realtimeEmitter.emitToRider(
+      dto.riderId,
+      'order:assigned_success',
+      {
+        orderId: assigned.id,
+        orderNumber: assigned.orderNumber,
+        status: assigned.status,
+      },
+    );
+
+    return {
+      success: true,
+      message: 'Rider assigned successfully',
+      orderId: assigned.id,
+      status: assigned.status,
+    };
+  }
+
+  async getCurrentOrderForRider(
+    riderId: string,
+  ): Promise<RiderOrderDetailsResponse> {
+    const order =
+      await this.orderRepository.findCurrentActiveByRiderId(riderId);
+    if (!order) {
+      throw new NotFoundException('No active order assigned to this rider');
+    }
+
+    return this.formatRiderOrderDetails(order);
+  }
+
+  async updateOrderStatusByRider(
+    orderId: string,
+    riderId: string,
+  ): Promise<RiderOrderDetailsResponse> {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.riderId !== riderId) {
+      throw new ForbiddenException(
+        'You are not authorized to update this order',
+      );
+    }
+
+    let nextStatus: OrderStatus;
+    if (order.status === OrderStatus.RIDER_ASSIGNED) {
+      nextStatus = OrderStatus.PICKED_UP;
+    } else if (order.status === OrderStatus.PICKED_UP) {
+      nextStatus = OrderStatus.DELIVERED;
+    } else {
+      throw new BadRequestException(
+        `Cannot transition order from status "${order.status}" by rider`,
+      );
+    }
+
+    const updated = await this.orderRepository.updateStatusByRider(
+      orderId,
+      riderId,
+      nextStatus,
+    );
+    if (!updated) {
+      throw new NotFoundException('Failed to update order status');
+    }
+
+    this.logger.log(
+      `Order ${orderId} status transitioned to "${nextStatus}" by rider ${riderId}`,
+    );
+
+    // Realtime broadcasts
+    void this.realtimeEmitter.emitToUser(
+      updated.userId,
+      'order:status_updated',
+      {
+        orderId: updated.id,
+        orderNumber: updated.orderNumber,
+        status: updated.status,
+        restaurantName: updated.restaurantName,
+      },
+    );
+
+    void this.realtimeEmitter.emitToSeller(
+      updated.restaurantId,
+      'order:status_updated',
+      {
+        orderId: updated.id,
+        orderNumber: updated.orderNumber,
+        status: updated.status,
+        riderId,
+      },
+    );
+
+    void this.realtimeEmitter.emitToRider(
+      riderId,
+      'order:status_updated',
+      {
+        orderId: updated.id,
+        orderNumber: updated.orderNumber,
+        status: updated.status,
+      },
+    );
+
+    return this.formatRiderOrderDetails(updated);
   }
 }

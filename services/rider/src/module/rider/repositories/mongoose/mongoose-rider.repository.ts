@@ -27,6 +27,7 @@ export class MongooseRiderRepository implements IRiderRepository {
       location: {
         type: 'Point',
         coordinates: obj.location?.coordinates || [0, 0],
+        formattedAddress: obj.location?.formattedAddress,
       },
       isAvailable: obj.isAvailable,
       lastActiveAt: obj.lastActiveAt,
@@ -47,6 +48,7 @@ export class MongooseRiderRepository implements IRiderRepository {
       location: {
         type: 'Point',
         coordinates: rider.location?.coordinates || [0, 0],
+        formattedAddress: rider.location?.formattedAddress,
       },
       isAvailable: rider.isAvailable ?? false,
       lastActiveAt: rider.lastActiveAt || new Date(),
@@ -77,10 +79,8 @@ export class MongooseRiderRepository implements IRiderRepository {
         {
           $set: {
             isAvailable,
-            location: {
-              type: 'Point',
-              coordinates,
-            },
+            'location.type': 'Point',
+            'location.coordinates': coordinates,
             lastActiveAt: new Date(),
           },
         },
@@ -116,5 +116,30 @@ export class MongooseRiderRepository implements IRiderRepository {
       .exec();
 
     return this.toDomain(doc);
+  }
+
+  async findNearbyAvailable(
+    coordinates: [number, number],
+    maxDistanceMeters = 5000,
+  ): Promise<RiderEntity[]> {
+    const docs = await this.riderModel
+      .find({
+        isAvailable: true,
+        isVerified: true,
+        location: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates,
+            },
+            $maxDistance: maxDistanceMeters,
+          },
+        },
+      })
+      .exec();
+
+    return docs
+      .map((doc) => this.toDomain(doc))
+      .filter((r): r is RiderEntity => r !== null);
   }
 }

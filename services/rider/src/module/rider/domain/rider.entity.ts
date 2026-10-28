@@ -1,6 +1,7 @@
 export interface GeoLocation {
   type: 'Point';
   coordinates: [number, number]; // [longitude, latitude]
+  formattedAddress?: string;
 }
 
 export class RiderEntity {

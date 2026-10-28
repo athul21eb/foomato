@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Param,
   Patch,
   Post,
   Put,
@@ -61,5 +62,34 @@ export class RiderController {
     @Body() dto: ToggleAvailabilityDto,
   ) {
     return this.riderService.toggleAvailability(userId, dto);
+  }
+
+  @Post('order/:orderId/accept')
+  @UseGuards(AuthGuard, RiderGuard)
+  @ResponseMessage('Order accepted successfully')
+  async acceptOrder(
+    @CurrentUser('id') userId: string,
+    @Param('orderId') orderId: string,
+  ) {
+    this.logger.log(`Accept order request received for order: ${orderId} by user: ${userId}`);
+    return this.riderService.acceptOrder(userId, orderId);
+  }
+
+  @Get('order/current')
+  @UseGuards(AuthGuard, RiderGuard)
+  @ResponseMessage('Current order fetched successfully')
+  async getCurrentOrder(@CurrentUser('id') userId: string) {
+    return this.riderService.getCurrentOrder(userId);
+  }
+
+  @Patch('order/:orderId/status')
+  @UseGuards(AuthGuard, RiderGuard)
+  @ResponseMessage('Order status updated successfully')
+  async updateOrderStatus(
+    @CurrentUser('id') userId: string,
+    @Param('orderId') orderId: string,
+  ) {
+    this.logger.log(`Update order status request received for order: ${orderId} by user: ${userId}`);
+    return this.riderService.updateOrderStatus(userId, orderId);
   }
 }

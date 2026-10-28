@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Seller } from '../types/seller.types';
 import {
   ShoppingBag,
@@ -27,9 +27,71 @@ import { formatCurrency } from '../../../lib/utils';
 import {
   useGetSellerOrdersQuery,
   useUpdateOrderStatusMutation,
+  useRetryRiderDispatchMutation,
 } from '../../../slices/order/orderApiSlice';
 import { useSellerSocket } from '../hooks/use-seller-socket';
 import type { OrderDetails } from '../../checkout/types/checkout.types';
+
+interface SellerRiderDispatchRetryProps {
+  orderId: string;
+  riderId?: string | null;
+  riderName?: string | null;
+  onRetry: (orderId: string) => Promise<void>;
+  isRetrying: boolean;
+}
+
+const SellerRiderDispatchRetry: React.FC<SellerRiderDispatchRetryProps> = ({
+  orderId,
+  riderId,
+  riderName,
+  onRetry,
+  isRetrying,
+}) => {
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(10);
+
+  useEffect(() => {
+    setSecondsRemaining(10);
+    const interval = setInterval(() => {
+      setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [orderId]);
+
+  if (riderId) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+        <Bike className="w-4 h-4 text-emerald-500" />
+        <span>Rider Assigned: {riderName || 'Courier Partner'}</span>
+      </div>
+    );
+  }
+
+  const handleRetryClick = async () => {
+    await onRetry(orderId);
+    setSecondsRemaining(10);
+  };
+
+  if (secondsRemaining > 0) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300">
+        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+        <span>Finding Rider ({secondsRemaining}s)</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={isRetrying}
+      onClick={handleRetryClick}
+      className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-linear-to-r from-orange-500 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+    >
+      <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+      <span>Retry Finding Rider</span>
+    </button>
+  );
+};
 
 interface SellerOrdersTabProps {
   seller: Seller;
@@ -70,6 +132,25 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
 
   const [updateStatus, { isLoading: isUpdating }] =
     useUpdateOrderStatusMutation();
+  const [retryDispatch, { isLoading: isRetryingDispatch }] =
+    useRetryRiderDispatchMutation();
+  const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
+
+  const handleRetryDispatch = async (orderId: string) => {
+    try {
+      setRetryingOrderId(orderId);
+      await retryDispatch({ orderId }).unwrap();
+      toast.success('Rider broadcast resent! Nearby riders notified.');
+    } catch (err: unknown) {
+      const errorMsg =
+        typeof err === 'object' && err && 'data' in err
+          ? (err as { data?: { message?: string } }).data?.message || 'Failed to retry dispatch'
+          : 'Failed to retry dispatch';
+      toast.error(errorMsg);
+    } finally {
+      setRetryingOrderId(null);
+    }
+  };
 
   const orders = ordersData?.orders || [];
   const totalOrders = ordersData?.total || 0;
@@ -526,10 +607,13 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
 
                   {/* When status is 'ready_for_rider' */}
                   {isReady && (
-                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                      <span>Rider Dispatch Active</span>
-                    </div>
+                    <SellerRiderDispatchRetry
+                      orderId={order.id}
+                      riderId={order.riderId}
+                      riderName={order.riderName}
+                      onRetry={handleRetryDispatch}
+                      isRetrying={isRetryingDispatch && retryingOrderId === order.id}
+                    />
                   )}
 
                   {/* Terminal states */}

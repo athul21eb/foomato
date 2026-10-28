@@ -48,6 +48,7 @@ export interface OrderDetails {
   paymentStatus: 'pending' | 'paid' | 'failed';
   reason?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SellerOrdersResponse {

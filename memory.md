@@ -151,6 +151,23 @@ Last updated: 2026-10-14T01:38:00+05:30
     - Bell icon notification toggle (Sound On/Muted) with instant audio pre-warming and test chime.
     - Kitchen FSM action buttons (Accept Order, Start Preparing, Ready for Rider, Handover, Decline modal with reason input).
 
+- **Order Ready Dispatch & Realtime Rider Matching (`services/seller` & `services/rider`)**:
+  - **Seller Service (`services/seller`) Event Publishing**:
+    - Refactored [order.service.ts](file:///home/athul/2026_grinding/foomato/services/seller/src/module/order/order.service.ts) to publish `ORDER_READY_FOR_RIDER` events to RabbitMQ `ORDER_READY_QUEUE` on `OrderStatus.READY_FOR_RIDER` transitions.
+    - Employs constructor injection (`RabbitmqService`, `ConfigService`), `this.configService.getOrThrow`, and distributed tracing (`RequestContext.getCorrelationId()`).
+    - Enriched event payload includes: `orderId`, `orderNumber`, `restaurantId`, `restaurantName`, `location` (pickup coordinates/address), `dropoffLocation` (customer coordinates/address), `riderAmount`, and `totalAmount`.
+  - **Rider Service (`services/rider`) Consumer & Infrastructure**:
+    - Created durable, retry-resilient [rabbitmq.service.ts](file:///home/athul/2026_grinding/foomato/services/rider/src/lib/rabbitmq/rabbitmq.service.ts) and `@Global()` [rabbitmq.module.ts](file:///home/athul/2026_grinding/foomato/services/rider/src/lib/rabbitmq/rabbitmq.module.ts).
+    - Created high-performance binary gRPC client [realtime-emitter.service.ts](file:///home/athul/2026_grinding/foomato/services/rider/src/lib/realtime-grpc/realtime-emitter.service.ts) and `@Global()` [realtime.module.ts](file:///home/athul/2026_grinding/foomato/services/rider/src/lib/realtime-grpc/realtime.module.ts) using `proto/realtime.proto` (Port 50054).
+    - Extended [rider.repository.interface.ts](file:///home/athul/2026_grinding/foomato/services/rider/src/module/rider/interfaces/rider.repository.interface.ts) and [mongoose-rider.repository.ts](file:///home/athul/2026_grinding/foomato/services/rider/src/module/rider/repositories/mongoose/mongoose-rider.repository.ts) with `findNearbyAvailable(coordinates, maxDistanceMeters = 5000)` using MongoDB `2dsphere` geospatial `$near` queries.
+    - Implemented [order-ready.consumer.ts](file:///home/athul/2026_grinding/foomato/services/rider/src/module/rider/consumers/order-ready.consumer.ts) listening on `ORDER_READY_QUEUE`:
+      - Dispatches `order:available` notifications via gRPC to all nearby verified & available riders (`user:${rider.userId}`).
+      - Replaced legacy HTTP `axios` calls with non-blocking gRPC streaming over port 50054.
+      - Full industrial logging with correlation ID propagation.
+  - **Realtime Service Gateway Hardening (`services/realtime`)**:
+    - Sealed [realtime.gateway.ts](file:///home/athul/2026_grinding/foomato/services/realtime/src/module/realtime/realtime.gateway.ts) against unauthorized room access, ensuring only users with `role === 'seller'` can bind to `seller:*` and `restaurant:*` rooms.
+    - Disallowed joining private identity rooms via generic `join:room`.
+
 ## Decisions made
 
 - **Direct Frontend-to-Utils Upload**:
@@ -170,24 +187,26 @@ Last updated: 2026-10-14T01:38:00+05:30
   - Frontend `use-seller-socket.ts` and `seller-orders-tab.tsx` display `orderNumber` directly with zero raw MongoDB ID exposure.
 - **gRPC for Internal Synchronous Pre-checks & Realtime Emissions**:
   - Synchronous order amount queries between `Utils` and `Seller` use gRPC over HTTP/2 with binary Protobuf serialization on port 50051.
-  - Inter-service push emissions from `Seller` to `Realtime` microservice use gRPC binary streaming on port 50054 (`proto/realtime.proto`).
-- **RabbitMQ for Asynchronous Payment Fulfillment**:
-  - Payment success verification publishes durable events to RabbitMQ `PAYMENT_QUEUE`, decoupling payment gateways from order fulfillment and preventing lost transactions during service restarts.
+  - Inter-service push emissions from `Seller` and `Rider` to `Realtime` microservice use gRPC binary streaming on port 50054 (`proto/realtime.proto`), with dedicated RPCs: `EmitToRoom`, `EmitToUser`, `EmitToSeller`, and `EmitToRider`.
+- **RabbitMQ for Asynchronous Payment Fulfillment & Rider Dispatch**:
+  - Payment success verification publishes durable events to RabbitMQ `PAYMENT_QUEUE`.
+  - Order packing completion (`ready_for_rider`) publishes durable events to RabbitMQ `ORDER_READY_QUEUE` for decentralized courier matching.
 - **Fail-Fast Configuration with `getOrThrow`**:
   - Standardized on `this.configService.getOrThrow<Type>('VAR_NAME')` across all services to guarantee that missing environment variables cause immediate startup failure instead of subtle runtime bugs. Documented in `AGENTS.md`.
 - **Industrial Logging & Zero-Secret Policy**:
   - Standardized in `AGENTS.md`: Every controller/service/consumer must use `new Logger(ClassName.name)`. Catch blocks type `catch (error: unknown)` with `instanceof Error` narrowing. Correlation IDs are managed via `AsyncLocalStorage` and never leak credentials or tokens.
 - **Single Canonical Route Architecture**:
-  - Eliminated all route aliases and array paths across all microservices (`auth`, `seller`, `utils`, `realtime`). Standardized on single, unambiguous RESTful routes. Codified in `AGENTS.md`.
+  - Eliminated all route aliases and array paths across all microservices (`auth`, `seller`, `utils`, `realtime`, `rider`). Standardized on single, unambiguous RESTful routes. Codified in `AGENTS.md`.
 
 ## Current state
 
 - `frontend`: `pnpm run build` (`tsc -b && vite build`) passes with 0 errors.
-- `services/seller`: `pnpm build` passes with 0 errors (HTTP :5001, gRPC :50051, Realtime gRPC Client :50054, RabbitMQ consumer, AppLoggerService active).
-- `services/realtime`: `pnpm build` passes with 0 errors (HTTP/WS :5004, gRPC Server :50054, Socket.IO Gateway active).
+- `services/seller`: `pnpm build` passes with 0 errors (HTTP :5001, gRPC :50051, Realtime gRPC Client :50054, RabbitMQ publisher & consumer, AppLoggerService active).
+- `services/rider`: `pnpm build` passes with 0 errors (HTTP :5003, Realtime gRPC Client :50054, RabbitMQ consumer `OrderReadyConsumer`, geospatial `$near` queries, AppLoggerService active).
+- `services/realtime`: `pnpm build` passes with 0 errors (HTTP/WS :5004, gRPC Server :50054, Socket.IO Gateway active, protected rooms).
 - `services/utils`: `pnpm build` passes with 0 errors (HTTP :5002, gRPC client, Razorpay + Stripe + RabbitMQ publisher, AppLoggerService active).
 - `services/auth`: `pnpm build` passes with 0 errors (HTTP :5000, AppLoggerService active, zero token leaks).
 
 ## Next session starts with
 
-- Customer live order tracking screen connecting to `realtime` gateway for live kitchen & rider status updates.
+- Customer live order tracking screen and Rider portal live order acceptance matching the new `order:available` socket event.

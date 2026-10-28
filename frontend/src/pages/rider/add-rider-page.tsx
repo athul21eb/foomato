@@ -167,6 +167,7 @@ export const AddRiderPage: React.FC = () => {
         drivingLicenseNumber: data.drivingLicenseNumber.trim(),
         latitude: data.latitude,
         longitude: data.longitude,
+        formattedAddress: data.formattedAddress?.trim() || undefined,
       }).unwrap();
 
       toast.success('Rider profile created successfully! Welcome to the fleet.');

@@ -51,4 +51,16 @@ export interface IOrderRepository {
       cancelled: number;
     };
   }>;
+  assignRiderAtomic(
+    orderId: string,
+    riderId: string,
+    riderName: string,
+    riderPhone: string,
+  ): Promise<OrderEntity | null>;
+  findCurrentActiveByRiderId(riderId: string): Promise<OrderEntity | null>;
+  updateStatusByRider(
+    orderId: string,
+    riderId: string,
+    targetStatus: OrderStatus,
+  ): Promise<OrderEntity | null>;
 }

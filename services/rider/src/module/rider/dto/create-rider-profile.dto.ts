@@ -4,6 +4,7 @@ import {
   IsLongitude,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   IsUrl,
 } from 'class-validator';
@@ -38,4 +39,8 @@ export class CreateRiderProfileDto {
   @IsNumber({}, { message: 'Longitude must be a valid number' })
   @IsLongitude({ message: 'Longitude must be between -180 and 180' })
   longitude: number;
+
+  @IsOptional()
+  @IsString()
+  formattedAddress?: string;
 }

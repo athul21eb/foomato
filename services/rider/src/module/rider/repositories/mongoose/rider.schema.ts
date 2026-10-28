@@ -8,6 +8,9 @@ export class LocationSubdocument {
 
   @Prop({ type: [Number], required: true })
   coordinates: [number, number]; // [longitude, latitude]
+
+  @Prop({ type: String, required: false })
+  formattedAddress?: string;
 }
 
 export const LocationSubdocumentSchema =

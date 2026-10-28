@@ -320,4 +320,66 @@ export class MongooseOrderRepository implements IOrderRepository {
 
     return { orders, total, counts };
   }
+
+  async assignRiderAtomic(
+    orderId: string,
+    riderId: string,
+    riderName: string,
+    riderPhone: string,
+  ): Promise<OrderEntity | null> {
+    if (!Types.ObjectId.isValid(orderId)) return null;
+
+    const doc = await this.orderModel
+      .findOneAndUpdate(
+        {
+          _id: orderId,
+          riderId: null,
+          status: OrderStatus.READY_FOR_RIDER,
+        },
+        {
+          $set: {
+            riderId,
+            riderName,
+            riderPhone: Number(riderPhone) || null,
+            status: OrderStatus.RIDER_ASSIGNED,
+          },
+        },
+        { returnDocument: 'after' },
+      )
+      .exec();
+
+    return this.toDomain(doc);
+  }
+
+  async findCurrentActiveByRiderId(
+    riderId: string,
+  ): Promise<OrderEntity | null> {
+    const doc = await this.orderModel
+      .findOne({
+        riderId,
+        status: { $in: [OrderStatus.RIDER_ASSIGNED, OrderStatus.PICKED_UP] },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+
+    return this.toDomain(doc);
+  }
+
+  async updateStatusByRider(
+    orderId: string,
+    riderId: string,
+    targetStatus: OrderStatus,
+  ): Promise<OrderEntity | null> {
+    if (!Types.ObjectId.isValid(orderId)) return null;
+
+    const doc = await this.orderModel
+      .findOneAndUpdate(
+        { _id: orderId, riderId },
+        { $set: { status: targetStatus } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+
+    return this.toDomain(doc);
+  }
 }

@@ -53,48 +53,59 @@ export class RealtimeGateway
       const decoded: DecodedUser = this.jwtService.verifyToken(token);
 
       const userId =
-        (decoded.sub as string | undefined) ||
-        (decoded._id as string | undefined) ||
-        (decoded.id as string | undefined) ||
-        (decoded.user?._id as string | undefined) ||
-        (decoded.user?.id as string | undefined);
+        decoded.sub || ((decoded as Record<string, unknown>).id as string);
 
       if (!userId) {
         this.logger.warn(
-          `Unauthorized socket connection attempt from ${client.id}: Token missing user ID`,
+          `Unauthorized socket connection attempt from ${client.id}: Token missing subject (sub)`,
         );
         client.disconnect();
         return;
       }
 
-      const sellerId =
-        (client.handshake.auth?.sellerId as string | undefined) ||
-        (client.handshake.auth?.restaurantId as string | undefined) ||
-        (decoded.sellerId as string | undefined) ||
-        (decoded.restaurantId as string | undefined) ||
-        (decoded.user?.restaurantId as string | undefined);
+      const role = decoded.role || null;
 
-      const role =
-        (decoded.role as string | undefined) ||
-        (decoded.user?.role as string | undefined);
+      // Extract seller/restaurant ID (from token claims or authenticated handshake)
+      const candidateSellerId =
+        decoded.sellerId ||
+        decoded.restaurantId ||
+        (client.handshake.auth?.sellerId as string | undefined);
+
+      // Authorization guard: Only users with 'seller' role may bind to seller notification rooms
+      const sellerId = role === 'seller' ? candidateSellerId : undefined;
+
+      // Extract rider ID (from token claims or authenticated handshake)
+      const candidateRiderId =
+        decoded.riderId ||
+        (client.handshake.auth?.riderId as string | undefined);
+
+      // Authorization guard: Only users with 'rider' role may bind to rider notification rooms
+      const riderId = role === 'rider' ? candidateRiderId : undefined;
 
       client.data.user = {
         userId,
         sellerId,
+        riderId,
         role,
         raw: decoded,
       };
 
-      // Auto-join private identity rooms
-      const userRoom = `user:${userId}`;
-      void client.join(userRoom);
+      // Auto-join private user identity room
+      void client.join(`user:${userId}`);
 
-      if (sellerId && role === "seller") {
+      // Auto-join seller rooms if authorized
+      if (sellerId) {
         void client.join(`seller:${sellerId}`);
+        void client.join(`restaurant:${sellerId}`);
+      }
+
+      // Auto-join rider room if authorized
+      if (riderId) {
+        void client.join(`rider:${riderId}`);
       }
 
       this.logger.log(
-        `Client connected [${client.id}] for user: ${userId} (rooms: ${Array.from(client.rooms).join(", ")})`,
+        `Client connected [${client.id}] for user: ${userId} (role: ${role || 'none'}, rooms: ${Array.from(client.rooms).join(', ')})`,
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -108,32 +119,84 @@ export class RealtimeGateway
   handleDisconnect(client: Socket): void {
     const user = client.data?.user as { userId?: string } | undefined;
     this.logger.log(
-      `Client disconnected [${client.id}] (user: ${user?.userId || "anonymous"})`,
+      `Client disconnected [${client.id}] (user: ${user?.userId || 'anonymous'})`,
     );
   }
 
-  @SubscribeMessage("join:seller")
+  @SubscribeMessage('join:seller')
   handleJoinSeller(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { sellerId?: string; restaurantId?: string },
+    @MessageBody() data: { sellerId?: string },
   ): void {
-    const id = data?.sellerId || data?.restaurantId;
+    const user = client.data?.user as
+      | { role?: string; sellerId?: string }
+      | undefined;
+
+    // Security guard: Non-sellers cannot subscribe to seller order streams
+    if (user?.role !== 'seller') {
+      this.logger.warn(
+        `Blocked unauthorized "join:seller" from client [${client.id}] with role "${user?.role || 'anonymous'}"`,
+      );
+      return;
+    }
+
+    const id = data?.sellerId || user.sellerId;
     if (id) {
       void client.join(`seller:${id}`);
       void client.join(`restaurant:${id}`);
-      this.logger.log(`Client [${client.id}] joined seller rooms for: ${id}`);
+      this.logger.log(
+        `Seller client [${client.id}] joined rooms: seller:${id}, restaurant:${id}`,
+      );
     }
   }
 
-  @SubscribeMessage("join:room")
+  @SubscribeMessage('join:rider')
+  handleJoinRider(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { riderId?: string },
+  ): void {
+    const user = client.data?.user as
+      | { role?: string; riderId?: string }
+      | undefined;
+
+    // Security guard: Non-riders cannot subscribe to rider dispatch streams
+    if (user?.role !== 'rider') {
+      this.logger.warn(
+        `Blocked unauthorized "join:rider" from client [${client.id}] with role "${user?.role || 'anonymous'}"`,
+      );
+      return;
+    }
+
+    const id = data?.riderId || user.riderId;
+    if (id) {
+      void client.join(`rider:${id}`);
+      this.logger.log(`Rider client [${client.id}] joined room: rider:${id}`);
+    }
+  }
+
+  @SubscribeMessage('join:room')
   handleJoinRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { room?: string },
   ): void {
-    if (data?.room) {
-      void client.join(data.room);
-      this.logger.log(`Client [${client.id}] joined room: ${data.room}`);
+    const room = data?.room?.trim();
+    if (!room) return;
+
+    // Security boundary: Disallow joining private identity rooms via generic join:room
+    if (
+      room.startsWith('user:') ||
+      room.startsWith('seller:') ||
+      room.startsWith('restaurant:') ||
+      room.startsWith('rider:')
+    ) {
+      this.logger.warn(
+        `Blocked client [${client.id}] from joining restricted identity room "${room}"`,
+      );
+      return;
     }
+
+    void client.join(room);
+    this.logger.log(`Client [${client.id}] joined room: ${room}`);
   }
 
   emitToRoom(room: string, event: string, payload: unknown): boolean {
@@ -156,6 +219,17 @@ export class RealtimeGateway
       `[Socket.IO] Emitting event "${event}" to seller rooms: "${sellerId}"`,
     );
     this.server.to(`seller:${sellerId}`).emit(event, payload ?? {});
+    return true;
+  }
+
+  emitToRider(riderId: string, event: string, payload: unknown): boolean {
+    this.logger.log(
+      `[Socket.IO] Emitting event "${event}" to rider "${riderId}"`,
+    );
+    this.server
+      .to(`rider:${riderId}`)
+      .to(`user:${riderId}`)
+      .emit(event, payload ?? {});
     return true;
   }
 

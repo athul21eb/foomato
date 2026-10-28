@@ -18,7 +18,14 @@ import { GetMyOrdersDto } from './dto/get-my-orders.dto';
 import { GetOrderForPaymentDto } from './dto/get-order-for-payment.dto';
 import { GetSellerOrdersDto } from './dto/get-seller-orders.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
-import type { GetOrderForPaymentResponse } from './interfaces/order-grpc.interface';
+import type {
+  GetOrderForPaymentResponse,
+  AssignRiderGrpcDto,
+  AssignRiderResponse,
+  GetCurrentRiderOrderGrpcDto,
+  UpdateOrderStatusByRiderGrpcDto,
+  RiderOrderDetailsResponse,
+} from './interfaces/order-grpc.interface';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { SellerGuard } from '../../common/guards/seller.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -73,6 +80,83 @@ export class OrderController {
     }
   }
 
+  @GrpcMethod('OrderService', 'AssignRider')
+  async assignRider(data: AssignRiderGrpcDto): Promise<AssignRiderResponse> {
+    this.logger.log(
+      `[gRPC] AssignRider requested: order ${data.orderId} -> rider ${data.riderId}`,
+    );
+
+    if (!data.orderId || !data.riderId) {
+      throw new RpcException('Order ID and Rider ID are required');
+    }
+
+    try {
+      return await this.orderService.assignRiderToOrder(data);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to assign rider';
+      this.logger.error(
+        `[gRPC] AssignRider failed for order ${data.orderId}: ${message}`,
+      );
+      throw new RpcException(message);
+    }
+  }
+
+  @GrpcMethod('OrderService', 'GetCurrentRiderOrder')
+  async getCurrentRiderOrder(
+    data: GetCurrentRiderOrderGrpcDto,
+  ): Promise<RiderOrderDetailsResponse> {
+    this.logger.log(
+      `[gRPC] GetCurrentRiderOrder requested for rider: ${data.riderId}`,
+    );
+
+    if (!data.riderId) {
+      throw new RpcException('Rider ID is required');
+    }
+
+    try {
+      return await this.orderService.getCurrentOrderForRider(data.riderId);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to fetch current order for rider';
+      this.logger.error(
+        `[gRPC] GetCurrentRiderOrder failed for rider ${data.riderId}: ${message}`,
+      );
+      throw new RpcException(message);
+    }
+  }
+
+  @GrpcMethod('OrderService', 'UpdateOrderStatusByRider')
+  async updateOrderStatusByRider(
+    data: UpdateOrderStatusByRiderGrpcDto,
+  ): Promise<RiderOrderDetailsResponse> {
+    this.logger.log(
+      `[gRPC] UpdateOrderStatusByRider requested for order ${data.orderId} by rider ${data.riderId}`,
+    );
+
+    if (!data.orderId || !data.riderId) {
+      throw new RpcException('Order ID and Rider ID are required');
+    }
+
+    try {
+      return await this.orderService.updateOrderStatusByRider(
+        data.orderId,
+        data.riderId,
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to update order status by rider';
+      this.logger.error(
+        `[gRPC] UpdateOrderStatusByRider failed for order ${data.orderId}: ${message}`,
+      );
+      throw new RpcException(message);
+    }
+  }
+
   @Get('my-orders')
   @UseGuards(AuthGuard)
   @ResponseMessage('User orders fetched successfully')
@@ -106,6 +190,17 @@ export class OrderController {
       orderId,
       dto,
     );
+    return { order };
+  }
+
+  @Post(':id/dispatch-retry')
+  @UseGuards(AuthGuard, SellerGuard)
+  @ResponseMessage('Rider dispatch broadcast retried successfully')
+  async retryRiderDispatch(
+    @CurrentUser('id') ownerId: string,
+    @Param('id') orderId: string,
+  ) {
+    const order = await this.orderService.retryRiderDispatch(ownerId, orderId);
     return { order };
   }
 

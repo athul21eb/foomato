@@ -4,6 +4,7 @@ import { RealtimeService } from './realtime.service';
 import { EmitToRoomDto } from './dto/emit-to-room.dto';
 import { EmitToUserDto } from './dto/emit-to-user.dto';
 import { EmitToSellerDto } from './dto/emit-to-seller.dto';
+import { EmitToRiderDto } from './dto/emit-to-rider.dto';
 import type { EmitResponse } from './interfaces/realtime.interface';
 
 @Controller()
@@ -76,6 +77,29 @@ export class RealtimeController {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
         `[gRPC] EmitToSeller failed for seller "${data.sellerId}": ${message}`,
+      );
+      throw new RpcException(message);
+    }
+  }
+
+  @GrpcMethod('RealtimeService', 'EmitToRider')
+  emitToRider(data: EmitToRiderDto): EmitResponse {
+    try {
+      this.logger.log(
+        `[gRPC] EmitToRider received - Event: "${data.event}", Rider: "${data.riderId}"`,
+      );
+
+      const success = this.realtimeService.emitToRider(
+        data.riderId,
+        data.event,
+        data.payloadJson,
+      );
+
+      return { success };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `[gRPC] EmitToRider failed for rider "${data.riderId}": ${message}`,
       );
       throw new RpcException(message);
     }

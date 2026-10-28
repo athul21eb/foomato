@@ -14,6 +14,7 @@ import { RiderEntity } from './domain/rider.entity';
 import { CreateRiderProfileDto } from './dto/create-rider-profile.dto';
 import { ToggleAvailabilityDto } from './dto/toggle-availability.dto';
 import { UpdateRiderProfileDto } from './dto/update-rider-profile.dto';
+import { OrderGrpcService } from '../../lib/order-grpc/order-grpc.service';
 
 @Injectable()
 export class RiderService {
@@ -22,6 +23,7 @@ export class RiderService {
   constructor(
     @Inject(RIDER_REPOSITORY)
     private readonly riderRepository: IRiderRepository,
+    private readonly orderGrpcService: OrderGrpcService,
   ) {}
 
   async createProfile(
@@ -43,6 +45,7 @@ export class RiderService {
       location: {
         type: 'Point',
         coordinates: [dto.longitude, dto.latitude],
+        formattedAddress: dto.formattedAddress?.trim() || undefined,
       },
       isAvailable: false,
       isVerified: false,
@@ -102,6 +105,13 @@ export class RiderService {
       payload.location = {
         type: 'Point',
         coordinates: [dto.longitude, dto.latitude],
+        formattedAddress: dto.formattedAddress?.trim() || rider.location?.formattedAddress,
+      };
+    } else if (dto.formattedAddress !== undefined) {
+      payload.location = {
+        type: 'Point',
+        coordinates: rider.location?.coordinates || [0, 0],
+        formattedAddress: dto.formattedAddress.trim(),
       };
     }
 
@@ -146,5 +156,109 @@ export class RiderService {
     );
 
     return updated;
+  }
+
+  async acceptOrder(userId: string, orderId: string) {
+    const rider = await this.riderRepository.findByUserId(userId);
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    if (!rider.isVerified) {
+      throw new ForbiddenException(
+        'Rider verification required to accept orders',
+      );
+    }
+
+    if (!rider.isAvailable) {
+      throw new BadRequestException(
+        'Rider must be online/available to accept orders',
+      );
+    }
+
+    try {
+      const res = await this.orderGrpcService.assignRider({
+        orderId,
+        riderId: rider.id,
+        riderName: rider.riderName,
+        riderPhone: rider.phoneNumber,
+      });
+
+      // Atomically mark rider busy (isAvailable: false)
+      await this.riderRepository.update(userId, { isAvailable: false });
+
+      this.logger.log(
+        `Rider ${rider.id} (user: ${userId}) accepted order ${orderId} successfully`,
+      );
+
+      return {
+        message: 'Order accepted successfully',
+        orderId: res.orderId,
+        status: res.status,
+      };
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to accept order';
+      this.logger.error(
+        `Rider ${rider.id} failed to accept order ${orderId}: ${message}`,
+      );
+      throw new BadRequestException(message);
+    }
+  }
+
+  async getCurrentOrder(userId: string) {
+    const rider = await this.riderRepository.findByUserId(userId);
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    try {
+      const order = await this.orderGrpcService.getCurrentRiderOrder(rider.id);
+      return { order };
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'No active order found';
+      this.logger.warn(
+        `Active order query for rider ${rider.id} returned: ${message}`,
+      );
+      return { order: null };
+    }
+  }
+
+  async updateOrderStatus(userId: string, orderId: string) {
+    const rider = await this.riderRepository.findByUserId(userId);
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    try {
+      const updatedOrder =
+        await this.orderGrpcService.updateOrderStatusByRider(
+          orderId,
+          rider.id,
+        );
+
+      // If the order has reached terminal 'delivered' state, restore rider duty to online!
+      if (updatedOrder.status === 'delivered') {
+        await this.riderRepository.update(userId, { isAvailable: true });
+        this.logger.log(
+          `Rider ${rider.id} delivered order ${orderId}. Duty status restored to ONLINE.`,
+        );
+      }
+
+      return {
+        message: `Order status updated to ${updatedOrder.status}`,
+        order: updatedOrder,
+      };
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to update order status';
+      this.logger.error(
+        `Rider ${rider.id} failed to update order ${orderId}: ${message}`,
+      );
+      throw new BadRequestException(message);
+    }
   }
 }

@@ -6,6 +6,7 @@ service RealtimeService {
   rpc EmitToRoom (EmitToRoomRequest) returns (EmitResponse);
   rpc EmitToUser (EmitToUserRequest) returns (EmitResponse);
   rpc EmitToSeller (EmitToSellerRequest) returns (EmitResponse);
+  rpc EmitToRider (EmitToRiderRequest) returns (EmitResponse);
 }
 
 message EmitToRoomRequest {
@@ -22,6 +23,12 @@ message EmitToUserRequest {
 
 message EmitToSellerRequest {
   string seller_id = 1;
+  string event = 2;
+  string payload_json = 3;
+}
+
+message EmitToRiderRequest {
+  string rider_id = 1;
   string event = 2;
   string payload_json = 3;
 }

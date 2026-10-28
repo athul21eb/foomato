@@ -3,19 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import jwt from 'jsonwebtoken';
 
 export interface DecodedUser {
-  sub?: string;
-  _id?: string;
-  id?: string;
+  sub: string;
   email?: string;
   role?: string | null;
+  image?: string;
+  sellerId?: string;
   restaurantId?: string;
-  user?: {
-    _id?: string;
-    id?: string;
-    email?: string;
-    role?: string | null;
-    restaurantId?: string;
-  };
+  riderId?: string;
   [key: string]: unknown;
 }
 

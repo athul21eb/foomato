@@ -20,6 +20,7 @@ import {
 } from '../../../lib/animations';
 import { useAuth } from '../../../context/use-auth';
 import { RiderEditModal } from './rider-edit-modal';
+import { useRiderLocationName } from '../hooks/use-rider-location-name';
 
 interface RiderProfileCardProps {
   rider: RiderProfile;
@@ -54,6 +55,11 @@ export const RiderProfileCard: React.FC<RiderProfileCardProps> = ({
 
   const [lng, lat] = rider.location?.coordinates || [0, 0];
   const hasValidCoordinates = !(lat === 0 && lng === 0);
+
+  const { placeName } = useRiderLocationName(
+    rider.location?.coordinates,
+    rider.location?.formattedAddress,
+  );
 
   return (
     <>
@@ -203,11 +209,14 @@ export const RiderProfileCard: React.FC<RiderProfileCardProps> = ({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] text-zinc-400 font-medium">Service Base</p>
-                    <p className="text-xs font-bold text-zinc-900 dark:text-white truncate font-mono">
-                      {hasValidCoordinates
-                        ? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-                        : 'GPS Pending'}
+                    <p className="text-xs font-bold text-zinc-900 dark:text-white truncate" title={placeName}>
+                      {placeName}
                     </p>
+                    {hasValidCoordinates && (
+                      <p className="text-[10px] text-zinc-400 font-mono">
+                        {lat.toFixed(4)}, {lng.toFixed(4)}
+                      </p>
+                    )}
                   </div>
                 </div>
               </InteractiveCard>
