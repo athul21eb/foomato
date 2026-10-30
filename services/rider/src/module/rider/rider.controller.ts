@@ -92,4 +92,11 @@ export class RiderController {
     this.logger.log(`Update order status request received for order: ${orderId} by user: ${userId}`);
     return this.riderService.updateOrderStatus(userId, orderId);
   }
+
+  @Get('orders/past')
+  @UseGuards(AuthGuard, RiderGuard)
+  @ResponseMessage('Past orders fetched successfully')
+  async getPastOrders(@CurrentUser('id') userId: string) {
+    return this.riderService.getPastOrders(userId);
+  }
 }

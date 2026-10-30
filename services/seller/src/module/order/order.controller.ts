@@ -25,6 +25,8 @@ import type {
   GetCurrentRiderOrderGrpcDto,
   UpdateOrderStatusByRiderGrpcDto,
   RiderOrderDetailsResponse,
+  GetRiderPastOrdersGrpcDto,
+  GetRiderPastOrdersResponse,
 } from './interfaces/order-grpc.interface';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { SellerGuard } from '../../common/guards/seller.guard';
@@ -152,6 +154,32 @@ export class OrderController {
           : 'Failed to update order status by rider';
       this.logger.error(
         `[gRPC] UpdateOrderStatusByRider failed for order ${data.orderId}: ${message}`,
+      );
+      throw new RpcException(message);
+    }
+  }
+
+  @GrpcMethod('OrderService', 'GetRiderPastOrders')
+  async getRiderPastOrders(
+    data: GetRiderPastOrdersGrpcDto,
+  ): Promise<GetRiderPastOrdersResponse> {
+    this.logger.log(
+      `[gRPC] GetRiderPastOrders requested for rider ${data.riderId}`,
+    );
+
+    if (!data.riderId) {
+      throw new RpcException('Rider ID is required');
+    }
+
+    try {
+      return await this.orderService.getRiderPastOrders(data.riderId);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to fetch past orders for rider';
+      this.logger.error(
+        `[gRPC] GetRiderPastOrders failed for rider ${data.riderId}: ${message}`,
       );
       throw new RpcException(message);
     }

@@ -50,12 +50,14 @@ const SellerRiderDispatchRetry: React.FC<SellerRiderDispatchRetryProps> = ({
   const [secondsRemaining, setSecondsRemaining] = useState<number>(10);
 
   useEffect(() => {
-    setSecondsRemaining(10);
+    if (secondsRemaining <= 0) return;
+
     const interval = setInterval(() => {
       setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
+
     return () => clearInterval(interval);
-  }, [orderId]);
+  }, [secondsRemaining]);
 
   if (riderId) {
     return (
@@ -397,6 +399,8 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
               const isAccepted = order.status === 'accepted';
               const isPreparing = order.status === 'preparing';
               const isReady = order.status === 'ready_for_rider';
+              const isRiderAssigned = order.status === 'rider_assigned';
+              const isPickedUp = order.status === 'picked_up';
               const isDelivered = order.status === 'delivered';
               const isCancelled = order.status === 'cancelled';
 
@@ -469,9 +473,21 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
                       </span>
                     )}
                     {isReady && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                         <Bike className="w-3.5 h-3.5" />
                         <span>Awaiting Rider Pickup</span>
+                      </span>
+                    )}
+                    {isRiderAssigned && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                        <Bike className="w-3.5 h-3.5" />
+                        <span>Rider Heading to Kitchen</span>
+                      </span>
+                    )}
+                    {isPickedUp && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Picked Up • Out for Delivery</span>
                       </span>
                     )}
                     {isDelivered && (
@@ -608,12 +624,69 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
                   {/* When status is 'ready_for_rider' */}
                   {isReady && (
                     <SellerRiderDispatchRetry
+                      key={order.id}
                       orderId={order.id}
                       riderId={order.riderId}
                       riderName={order.riderName}
                       onRetry={handleRetryDispatch}
                       isRetrying={isRetryingDispatch && retryingOrderId === order.id}
                     />
+                  )}
+
+                  {/* When status is 'rider_assigned' */}
+                  {isRiderAssigned && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0">
+                          <Bike className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-extrabold text-zinc-900 dark:text-white">
+                            Rider Assigned: {order.riderName || 'Courier Partner'}
+                          </p>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                            Courier is navigating to your restaurant to pick up this order.
+                          </p>
+                        </div>
+                      </div>
+                      {order.riderPhone && (
+                        <a
+                          href={`tel:${order.riderPhone}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-700 dark:text-blue-300 text-xs font-bold transition-colors w-fit"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>Call Rider ({order.riderPhone})</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* When status is 'picked_up' */}
+                  {isPickedUp && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                            Picked Up by Rider {order.riderName ? `(${order.riderName})` : ''}
+                          </p>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                            Order has left the kitchen and is en route to customer dropoff.
+                          </p>
+                        </div>
+                      </div>
+                      {order.riderPhone && (
+                        <a
+                          href={`tel:${order.riderPhone}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-colors w-fit"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>Call Rider ({order.riderPhone})</span>
+                        </a>
+                      )}
+                    </div>
                   )}
 
                   {/* Terminal states */}

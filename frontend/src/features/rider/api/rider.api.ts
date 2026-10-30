@@ -8,4 +8,5 @@ export {
   useGetCurrentOrderQuery,
   useAcceptOrderMutation,
   useUpdateOrderStatusMutation,
+  useGetPastOrdersQuery,
 } from '../../../slices/rider/riderApiSlice';

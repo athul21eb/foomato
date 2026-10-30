@@ -127,6 +127,33 @@ export function useCustomerSocket() {
       },
     );
 
+    // Invalidate immediately when rider accepts/assigned to order
+    socket.on(
+      'order:rider_assigned',
+      (payload: {
+        orderId?: string;
+        orderNumber?: string;
+        riderName?: string;
+        riderPhone?: string;
+        [key: string]: unknown;
+      }) => {
+        dispatch(orderApiSlice.util.invalidateTags(['Order']));
+
+        const displayNum =
+          payload?.orderNumber ||
+          (payload?.orderId
+            ? `#ORD-${payload.orderId.slice(-6).toUpperCase()}`
+            : 'Order');
+
+        toast.info(`🛵 ${displayNum}: Rider Assigned`, {
+          description: payload?.riderName
+            ? `${payload.riderName} has been assigned and is heading to pick up your order.`
+            : 'A delivery partner has been assigned to your order.',
+          duration: 6000,
+        });
+      },
+    );
+
     return () => {
       socket.disconnect();
       socketRef.current = null;

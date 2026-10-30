@@ -173,18 +173,11 @@ export function useRiderSocket({
     };
   }, [enabled, token, riderId, dispatch, playNotificationSound]);
 
-  // If rider goes offline, clear incoming alerts
-  useEffect(() => {
-    if (!isAvailable) {
-      setIncomingOrders([]);
-    }
-  }, [isAvailable]);
-
   return {
     isConnected,
     isMuted,
     toggleMute,
-    incomingOrders,
+    incomingOrders: isAvailable ? incomingOrders : [],
     dismissAlert,
     clearAlerts,
     playNotificationSound,

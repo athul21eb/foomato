@@ -32,6 +32,13 @@ export interface UpdateOrderStatusByRiderGrpcDto {
   riderId: string;
 }
 
+export interface RiderOrderItemGrpc {
+  itemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export interface RiderOrderDetailsResponse {
   orderId: string;
   orderNumber: string;
@@ -48,4 +55,19 @@ export interface RiderOrderDetailsResponse {
   deliveryLng: number;
   customerPhone: string;
   itemsSummary: string;
+  restaurantPhone?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  customerName?: string;
+  items?: RiderOrderItemGrpc[];
+}
+
+export interface GetRiderPastOrdersGrpcDto {
+  riderId: string;
+}
+
+export interface GetRiderPastOrdersResponse {
+  orders: RiderOrderDetailsResponse[];
+  total: number;
+  totalEarnings: number;
 }

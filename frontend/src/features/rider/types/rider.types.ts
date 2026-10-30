@@ -78,24 +78,28 @@ export interface RiderCurrentOrder {
   status:
     | 'ready_for_rider'
     | 'rider_assigned'
+    | 'picked_up'
     | 'out_for_delivery'
     | 'delivered'
     | string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
   restaurantId: string;
   restaurantName: string;
-  restaurantPhone: string;
-  restaurantAddress: string;
-  deliveryAddress?: RiderDeliveryAddress;
-  items: RiderOrderItem[];
+  restaurantPhone?: string;
+  restaurantAddress?: string;
+  pickupAddress?: string;
+  deliveryAddress?: RiderDeliveryAddress | string;
+  items?: RiderOrderItem[];
+  itemsSummary?: string;
   totalAmount: number;
-  deliveryFee: number;
-  paymentMethod: string;
-  paymentStatus: string;
-  createdAt: string;
-  updatedAt: string;
+  riderAmount?: number;
+  deliveryFee?: number;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface IncomingOrderAlert {

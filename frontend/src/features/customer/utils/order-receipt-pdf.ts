@@ -269,7 +269,7 @@ export async function generateOrderReceiptPdf(order: OrderDetails): Promise<void
   // 5. Payment Summary Breakdown (Right Aligned)
   const summaryBoxWidth = 84;
   const summaryX = pageWidth - margin - summaryBoxWidth;
-  let summaryY = finalY;
+  const summaryY = finalY;
 
   // Background box for summary
   doc.setFillColor(250, 250, 250);

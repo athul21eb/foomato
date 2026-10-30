@@ -28,6 +28,7 @@ import type {
   AssignRiderGrpcDto,
   AssignRiderResponse,
   RiderOrderDetailsResponse,
+  GetRiderPastOrdersResponse,
 } from './interfaces/order-grpc.interface';
 
 export interface CreateOrderResponse {
@@ -572,7 +573,9 @@ export class OrderService {
       this.logger.error(
         `Failed to re-publish ORDER_READY_FOR_RIDER event for order ${orderId}: ${message}`,
       );
-      throw new BadRequestException('Failed to dispatch notification to riders');
+      throw new BadRequestException(
+        'Failed to dispatch notification to riders',
+      );
     }
 
     return order;
@@ -588,6 +591,13 @@ export class OrderService {
         ?.map((i) => `${i.name} x${i.quantity ?? i.quauntity ?? 1}`)
         .join(', ') || '';
 
+    const items = (order.items || []).map((i) => ({
+      itemId: i.itemId || '',
+      name: i.name || '',
+      price: Number(i.price || 0),
+      quantity: Number(i.quantity ?? i.quauntity ?? 1),
+    }));
+
     return {
       orderId: order.id,
       orderNumber: order.orderNumber || order.id,
@@ -599,11 +609,19 @@ export class OrderService {
       pickupAddress: restaurant?.autoLocation?.formattedAddress || '',
       pickupLat: restaurant?.autoLocation?.coordinates?.[1] || 0,
       pickupLng: restaurant?.autoLocation?.coordinates?.[0] || 0,
-      deliveryAddress: order.deliveryAddress?.formattedAddress || '',
+      deliveryAddress:
+        order.deliveryAddress?.formattedAddress ||
+        order.deliveryAddress?.fromattedAddress ||
+        '',
       deliveryLat: order.deliveryAddress?.latitude || 0,
       deliveryLng: order.deliveryAddress?.longitude || 0,
       customerPhone: String(order.deliveryAddress?.mobile || ''),
       itemsSummary,
+      restaurantPhone: String(restaurant?.phone || ''),
+      paymentMethod: order.paymentMethod || 'online',
+      paymentStatus: order.paymentStatus || 'paid',
+      customerName: 'Customer',
+      items,
     };
   }
 
@@ -647,11 +665,33 @@ export class OrderService {
         riderPhone: assigned.riderPhone,
       },
     );
+    void this.realtimeEmitter.emitToUser(
+      assigned.userId,
+      'order:status_updated',
+      {
+        orderId: assigned.id,
+        orderNumber: assigned.orderNumber,
+        status: assigned.status,
+        riderName: assigned.riderName,
+        riderPhone: assigned.riderPhone,
+      },
+    );
 
     // Notify Restaurant
     void this.realtimeEmitter.emitToSeller(
       assigned.restaurantId,
       'order:rider_assigned',
+      {
+        orderId: assigned.id,
+        orderNumber: assigned.orderNumber,
+        status: assigned.status,
+        riderId: dto.riderId,
+        riderName: assigned.riderName,
+      },
+    );
+    void this.realtimeEmitter.emitToSeller(
+      assigned.restaurantId,
+      'order:status_updated',
       {
         orderId: assigned.id,
         orderNumber: assigned.orderNumber,
@@ -754,16 +794,29 @@ export class OrderService {
       },
     );
 
-    void this.realtimeEmitter.emitToRider(
-      riderId,
-      'order:status_updated',
-      {
-        orderId: updated.id,
-        orderNumber: updated.orderNumber,
-        status: updated.status,
-      },
-    );
+    void this.realtimeEmitter.emitToRider(riderId, 'order:status_updated', {
+      orderId: updated.id,
+      orderNumber: updated.orderNumber,
+      status: updated.status,
+    });
 
     return this.formatRiderOrderDetails(updated);
+  }
+
+  async getRiderPastOrders(
+    riderId: string,
+  ): Promise<GetRiderPastOrdersResponse> {
+    const { orders, total, totalEarnings } =
+      await this.orderRepository.findPastOrdersByRiderId(riderId);
+
+    const formatted = await Promise.all(
+      orders.map((order) => this.formatRiderOrderDetails(order)),
+    );
+
+    return {
+      orders: formatted,
+      total,
+      totalEarnings,
+    };
   }
 }

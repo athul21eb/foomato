@@ -133,7 +133,17 @@ export class MongooseOrderRepository implements IOrderRepository {
   }> {
     const filter: Record<string, unknown> = { restaurantId };
     if (status) {
-      filter.status = status;
+      if (status === OrderStatus.READY_FOR_RIDER) {
+        filter.status = {
+          $in: [
+            OrderStatus.READY_FOR_RIDER,
+            OrderStatus.RIDER_ASSIGNED,
+            OrderStatus.PICKED_UP,
+          ],
+        };
+      } else {
+        filter.status = status;
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -158,6 +168,8 @@ export class MongooseOrderRepository implements IOrderRepository {
       accepted: 0,
       preparing: 0,
       ready_for_rider: 0,
+      rider_assigned: 0,
+      picked_up: 0,
       delivered: 0,
       cancelled: 0,
     };
@@ -170,6 +182,11 @@ export class MongooseOrderRepository implements IOrderRepository {
       }
     }
     counts.all = totalAll;
+    // Combine ready_for_rider, rider_assigned, and picked_up into ready_for_rider count
+    counts.ready_for_rider =
+      (counts.ready_for_rider || 0) +
+      (counts.rider_assigned || 0) +
+      (counts.picked_up || 0);
 
     const orders = docs
       .map((doc) => this.toDomain(doc))
@@ -381,5 +398,35 @@ export class MongooseOrderRepository implements IOrderRepository {
       .exec();
 
     return this.toDomain(doc);
+  }
+
+  async findPastOrdersByRiderId(
+    riderId: string,
+    limit: number = 20,
+  ): Promise<{ orders: OrderEntity[]; total: number; totalEarnings: number }> {
+    const filter = { riderId, status: OrderStatus.DELIVERED };
+    const [docs, total, earningsAgg] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments(filter).exec(),
+      this.orderModel.aggregate([
+        { $match: filter },
+        { $group: { _id: null, totalEarnings: { $sum: '$riderAmount' } } },
+      ]),
+    ]);
+
+    const totalEarnings =
+      earningsAgg.length > 0 && typeof earningsAgg[0].totalEarnings === 'number'
+        ? earningsAgg[0].totalEarnings
+        : 0;
+
+    const orders = docs
+      .map((doc) => this.toDomain(doc))
+      .filter((order): order is OrderEntity => order !== null);
+
+    return { orders, total, totalEarnings };
   }
 }

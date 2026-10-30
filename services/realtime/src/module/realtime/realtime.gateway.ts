@@ -218,7 +218,10 @@ export class RealtimeGateway
     this.logger.log(
       `[Socket.IO] Emitting event "${event}" to seller rooms: "${sellerId}"`,
     );
-    this.server.to(`seller:${sellerId}`).emit(event, payload ?? {});
+    this.server
+      .to(`seller:${sellerId}`)
+      .to(`restaurant:${sellerId}`)
+      .emit(event, payload ?? {});
     return true;
   }
 

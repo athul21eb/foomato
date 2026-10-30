@@ -71,4 +71,18 @@ export class OrderGrpcService implements OnModuleInit {
       ),
     );
   }
+
+  async getRiderPastOrders(
+    riderId: string,
+  ): Promise<import('./interfaces/order-grpc.interface').GetRiderPastOrdersResponse> {
+    this.logger.log(
+      `[gRPC] Invoking GetRiderPastOrders on Seller service for rider ${riderId}`,
+    );
+    return firstValueFrom(
+      this.orderGrpcClient.getRiderPastOrders(
+        { riderId },
+        this.buildMetadata(),
+      ),
+    );
+  }
 }

@@ -24,6 +24,13 @@ export interface UpdateOrderStatusByRiderRequest {
   riderId: string;
 }
 
+export interface RiderOrderItemGrpc {
+  itemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export interface RiderOrderDetailsResponse {
   orderId: string;
   orderNumber: string;
@@ -40,6 +47,21 @@ export interface RiderOrderDetailsResponse {
   deliveryLng: number;
   customerPhone: string;
   itemsSummary: string;
+  restaurantPhone?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  customerName?: string;
+  items?: RiderOrderItemGrpc[];
+}
+
+export interface GetRiderPastOrdersRequest {
+  riderId: string;
+}
+
+export interface GetRiderPastOrdersResponse {
+  orders: RiderOrderDetailsResponse[];
+  total: number;
+  totalEarnings: number;
 }
 
 export interface OrderGrpcClient {
@@ -55,4 +77,8 @@ export interface OrderGrpcClient {
     data: UpdateOrderStatusByRiderRequest,
     metadata?: Metadata,
   ): Observable<RiderOrderDetailsResponse>;
+  getRiderPastOrders(
+    data: GetRiderPastOrdersRequest,
+    metadata?: Metadata,
+  ): Observable<GetRiderPastOrdersResponse>;
 }

@@ -145,6 +145,37 @@ export function useSellerSocket({ sellerId }: UseSellerSocketOptions) {
       dispatch(orderApiSlice.util.invalidateTags(['SellerOrders']));
     });
 
+    // Invalidate immediately when rider accepts/assigned to order
+    socket.on(
+      'order:rider_assigned',
+      (payload: {
+        orderId?: string;
+        orderNumber?: string;
+        riderName?: string;
+        riderPhone?: string;
+        [key: string]: unknown;
+      }) => {
+        dispatch(orderApiSlice.util.invalidateTags(['SellerOrders']));
+
+        const displayNum =
+          payload?.orderNumber ||
+          (payload?.orderId
+            ? `#ORD-${payload.orderId.slice(-6).toUpperCase()}`
+            : 'Order');
+
+        toast.info(
+          payload?.riderName
+            ? `🛵 Rider ${payload.riderName} assigned to ${displayNum}`
+            : `🛵 Rider assigned to ${displayNum}`,
+          {
+            description:
+              'Courier partner has accepted the order and is navigating to your kitchen.',
+            duration: 6000,
+          },
+        );
+      },
+    );
+
     return () => {
       socket.removeAllListeners();
       socket.disconnect();

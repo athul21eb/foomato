@@ -63,4 +63,8 @@ export interface IOrderRepository {
     riderId: string,
     targetStatus: OrderStatus,
   ): Promise<OrderEntity | null>;
+  findPastOrdersByRiderId(
+    riderId: string,
+    limit?: number,
+  ): Promise<{ orders: OrderEntity[]; total: number; totalEarnings: number }>;
 }

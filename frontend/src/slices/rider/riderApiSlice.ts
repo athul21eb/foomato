@@ -56,7 +56,7 @@ const baseQueryWithReAuth: BaseQueryFn<
 export const riderApiSlice = createApi({
   reducerPath: 'riderApi',
   baseQuery: baseQueryWithReAuth,
-  tagTypes: ['Rider', 'RiderCurrentOrder'],
+  tagTypes: ['Rider', 'RiderCurrentOrder', 'RiderPastOrders'],
   endpoints: (builder) => ({
     getMyRider: builder.query<RiderProfile, void>({
       query: () => '/rider/profile',
@@ -169,7 +169,26 @@ export const riderApiSlice = createApi({
           order: import('../../features/rider/types/rider.types').RiderCurrentOrder;
         }>,
       ) => response.data,
-      invalidatesTags: ['RiderCurrentOrder', 'Rider'],
+      invalidatesTags: ['RiderCurrentOrder', 'Rider', 'RiderPastOrders'],
+    }),
+
+    getPastOrders: builder.query<
+      {
+        orders: import('../../features/rider/types/rider.types').RiderCurrentOrder[];
+        total: number;
+        totalEarnings: number;
+      },
+      void
+    >({
+      query: () => '/rider/orders/past',
+      transformResponse: (
+        response: ApiResponse<{
+          orders: import('../../features/rider/types/rider.types').RiderCurrentOrder[];
+          total: number;
+          totalEarnings: number;
+        }>,
+      ) => response.data,
+      providesTags: ['RiderPastOrders'],
     }),
   }),
 });
@@ -183,4 +202,5 @@ export const {
   useGetCurrentOrderQuery,
   useAcceptOrderMutation,
   useUpdateOrderStatusMutation,
+  useGetPastOrdersQuery,
 } = riderApiSlice;

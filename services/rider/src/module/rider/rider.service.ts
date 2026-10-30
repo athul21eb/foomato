@@ -237,6 +237,12 @@ export class RiderService {
           orderId,
           rider.id,
         );
+      if (updatedOrder.status === 'picked_up') {
+        await this.riderRepository.update(userId, { isAvailable: false });
+        this.logger.log(
+          `Rider ${rider.id} picked up order ${orderId}. In-transit status active.`,
+        );
+      }
 
       // If the order has reached terminal 'delivered' state, restore rider duty to online!
       if (updatedOrder.status === 'delivered') {
@@ -259,6 +265,24 @@ export class RiderService {
         `Rider ${rider.id} failed to update order ${orderId}: ${message}`,
       );
       throw new BadRequestException(message);
+    }
+  }
+
+  async getPastOrders(userId: string) {
+    const rider = await this.riderRepository.findByUserId(userId);
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    try {
+      return await this.orderGrpcService.getRiderPastOrders(rider.id);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to fetch past trips';
+      this.logger.error(
+        `Failed to fetch past trips for rider ${rider.id}: ${message}`,
+      );
+      return { orders: [], total: 0, totalEarnings: 0 };
     }
   }
 }

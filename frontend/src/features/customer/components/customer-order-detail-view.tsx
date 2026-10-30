@@ -71,6 +71,7 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
   onBack,
   socketConnected = false,
 }) => {
+  const [isGeneratingPdf, setIsGeneratingPdf] = React.useState(false);
   const { data: order, isLoading, isError } = useGetOrderByIdQuery(orderId);
 
   if (isLoading) {
@@ -116,8 +117,6 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
   const currentStep = getStepIndex(order.status);
   const displayNum =
     order.orderNumber || `#ORD-${order.id.slice(-6).toUpperCase()}`;
-
-  const [isGeneratingPdf, setIsGeneratingPdf] = React.useState(false);
 
   const handleDownloadReceipt = async () => {
     if (!canPrintReceipt || isGeneratingPdf) return;
@@ -231,7 +230,11 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
               {/* Progress Line */}
               <div className="hidden sm:block absolute top-1/2 left-0 right-0 h-1 bg-zinc-200 dark:bg-zinc-800 -translate-y-1/2 rounded-full" />
               <div
-                className="hidden sm:block absolute top-1/2 left-0 h-1 bg-linear-to-r from-orange-500 to-amber-500 -translate-y-1/2 rounded-full transition-all duration-500"
+                className={`hidden sm:block absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full transition-all duration-500 ${
+                  isDelivered
+                    ? 'bg-emerald-500'
+                    : 'bg-linear-to-r from-orange-500 to-amber-500'
+                }`}
                 style={{
                   width: `${(currentStep / (ORDER_STEPS.length - 1)) * 100}%`,
                 }}
@@ -240,7 +243,7 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 relative z-10">
                 {ORDER_STEPS.map((step, idx) => {
                   const isPassed = idx <= currentStep;
-                  const isCurrent = idx === currentStep;
+                  const isCurrent = idx === currentStep && !isDelivered;
 
                   return (
                     <AnimatedStepItem
