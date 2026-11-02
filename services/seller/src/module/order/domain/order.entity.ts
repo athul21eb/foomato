@@ -45,6 +45,11 @@ export class OrderEntity {
   userId: string;
   restaurantId: string;
   restaurantName: string;
+  restaurantLocation?: {
+    type: 'Point';
+    coordinates: [number, number];
+    formattedAddress?: string;
+  };
   riderId?: string | null;
   riderPhone?: number | null;
   riderName?: string | null;

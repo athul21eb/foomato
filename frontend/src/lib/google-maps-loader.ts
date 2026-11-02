@@ -46,6 +46,8 @@ export const loadGoogleMaps = (apiKeyOverride?: string): Promise<typeof google.m
             window.google.maps.importLibrary('maps'),
             window.google.maps.importLibrary('places'),
             window.google.maps.importLibrary('marker'),
+            window.google.maps.importLibrary('routes'),
+            window.google.maps.importLibrary('geometry'),
           ]);
         }
       } catch (err) {

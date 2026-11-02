@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -22,6 +22,8 @@ import {
   AnimatedReceiptRow,
   AnimatedLivePulseBadge,
 } from '../../../lib/animations';
+import { LiveTrackingMap } from './live-tracking-map';
+import { useOrderTracking } from '../hooks/use-order-tracking';
 
 interface MilestoneStep {
   key: string;
@@ -48,9 +50,9 @@ function getStepIndex(status: string): number {
     case 'accepted':
       return 1;
     case 'preparing':
-      return 2;
     case 'ready_for_rider':
     case 'rider_assigned':
+      return 2;
     case 'picked_up':
       return 3;
     case 'delivered':
@@ -58,6 +60,29 @@ function getStepIndex(status: string): number {
     default:
       return 0;
   }
+}
+
+function getStepSubtitle(
+  stepKey: string,
+  status: string,
+  riderName?: string | null,
+): string {
+  if (stepKey === 'preparing') {
+    if (status === 'rider_assigned') {
+      return riderName ? `${riderName} heading to store` : 'Rider assigned';
+    }
+    if (status === 'ready_for_rider') {
+      return 'Food packed & ready';
+    }
+    return 'Cooking fresh';
+  }
+  if (stepKey === 'picked_up') {
+    if (status === 'picked_up') {
+      return riderName ? `${riderName} on the way` : 'Rider on the way';
+    }
+    return 'Waiting for pickup';
+  }
+  return '';
 }
 
 interface CustomerOrderDetailViewProps {
@@ -73,6 +98,56 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
 }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = React.useState(false);
   const { data: order, isLoading, isError } = useGetOrderByIdQuery(orderId);
+  const { riderLocation } = useOrderTracking(orderId);
+
+  const origin = useMemo(() => {
+    const coords = order?.restaurantLocation?.coordinates;
+    if (
+      coords &&
+      coords.length >= 2 &&
+      Number(coords[0]) !== 0 &&
+      Number(coords[1]) !== 0
+    ) {
+      return {
+        lng: Number(coords[0]),
+        lat: Number(coords[1]),
+        title: order?.restaurantName || 'Restaurant',
+        address: order?.restaurantLocation?.formattedAddress,
+      };
+    }
+    return {
+      lat: 9.9312,
+      lng: 76.2673,
+      title: order?.restaurantName || 'Restaurant Kitchen',
+      address: 'Main Store Branch',
+    };
+  }, [order?.restaurantLocation, order?.restaurantName]);
+
+  const destination = useMemo(() => {
+    let lat = Number(order?.deliveryAddress?.latitude);
+    let lng = Number(order?.deliveryAddress?.longitude);
+
+    if (!lat || !lng || isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      lat = origin.lat + 0.012;
+      lng = origin.lng + 0.015;
+    } else if (
+      Math.abs(lat - origin.lat) < 0.0001 &&
+      Math.abs(lng - origin.lng) < 0.0001
+    ) {
+      lat = origin.lat + 0.012;
+      lng = origin.lng + 0.015;
+    }
+
+    return {
+      lat,
+      lng,
+      title: 'Delivery Address',
+      address:
+        order?.deliveryAddress?.formattedAddress ||
+        order?.deliveryAddress?.fromattedAddress ||
+        'Customer Address',
+    };
+  }, [order?.deliveryAddress, origin.lat, origin.lng]);
 
   if (isLoading) {
     return (
@@ -113,6 +188,9 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
 
   const isCancelled = order.status === 'cancelled';
   const isDelivered = order.status === 'delivered';
+  const isRiderAssigned = order.status === 'rider_assigned';
+  const isPickedUp = order.status === 'picked_up';
+  const hasRiderAccepted = isRiderAssigned || isPickedUp;
   const canPrintReceipt = isDelivered || isCancelled;
   const currentStep = getStepIndex(order.status);
   const displayNum =
@@ -146,6 +224,21 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
         </button>
 
         <div className="flex items-center gap-3">
+          {!isDelivered && !isCancelled && hasRiderAccepted && (
+            <button
+              type="button"
+              onClick={() => {
+                document
+                  .getElementById('order-detail-live-map')
+                  ?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
+            >
+              <Bike className="w-3.5 h-3.5" />
+              <span>Track Live Map</span>
+            </button>
+          )}
+
           {canPrintReceipt && (
             <button
               type="button"
@@ -279,10 +372,14 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
                               : 'text-zinc-400'
                           }`}
                         >
-                          {step.title}
+                          {step.key === 'preparing' && order.status === 'ready_for_rider'
+                            ? 'Food Packed'
+                            : step.key === 'preparing' && order.status === 'rider_assigned'
+                            ? 'Rider Assigned'
+                            : step.title}
                         </p>
                         <p className="text-[10px] text-zinc-400 mt-0.5">
-                          {step.subtitle}
+                          {getStepSubtitle(step.key, order.status, order.riderName) || step.subtitle}
                         </p>
                       </div>
                     </AnimatedStepItem>
@@ -414,6 +511,72 @@ export const CustomerOrderDetailView: React.FC<CustomerOrderDetailViewProps> = (
           </div>
         </div>
       </div>
+
+      {/* Live Rider Location & Road Tracking Map (Only shown after rider accepts the order) */}
+      {!isCancelled && !isDelivered && hasRiderAccepted && (
+        <div
+          id="order-detail-live-map"
+          className="rounded-3xl bg-white/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 backdrop-blur-xl p-5 sm:p-6 shadow-xs space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
+                <Bike className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-zinc-900 dark:text-white">
+                  Live Courier Tracking
+                </h3>
+                <p className="text-[11px] text-zinc-400">
+                  {isPickedUp
+                    ? `${order.riderName || 'Courier'} is on the road with your food`
+                    : `${order.riderName || 'Courier'} assigned & heading to store for pickup`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Live GPS Road Stream</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="h-95 sm:h-112.5 w-full rounded-2xl overflow-hidden shadow-inner">
+            <LiveTrackingMap
+              origin={origin}
+              destination={destination}
+              riderLocation={riderLocation}
+              orderStatus={order.status}
+              riderName={order.riderName || 'Delivery Rider'}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* When rider has not accepted yet: Informative preparation / dispatch status card */}
+      {!isCancelled && !isDelivered && !hasRiderAccepted && (
+        <div className="rounded-3xl bg-white/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 backdrop-blur-xl p-5 sm:p-6 shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+              <Bike className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-zinc-900 dark:text-white">
+                {order.status === 'ready_for_rider'
+                  ? 'Food is freshly packed & ready'
+                  : 'Kitchen is preparing your order'}
+              </h4>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                {order.status === 'ready_for_rider'
+                  ? 'Finding a nearby delivery partner. Live GPS tracking will activate here as soon as a courier accepts.'
+                  : 'Live road tracking activates automatically once a delivery partner accepts and picks up your order.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </AnimatedDetailTransition>
   );
 };

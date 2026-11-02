@@ -336,9 +336,9 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
         </div>
       </div>
 
-      {/* Filter Tabs Bar - Segmented Allocation */}
+      {/* Filter Tabs Bar - Segmented Allocation with Mobile Touch Scrolling */}
       <div className="p-1 sm:p-1.5 rounded-2xl bg-zinc-100/90 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs">
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar sm:grid sm:grid-cols-7 w-full">
+        <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 sm:pb-0 sm:grid sm:grid-cols-7 sm:gap-1 w-full overscroll-x-contain touch-pan-x">
           {statusPills.map((tab) => {
             const isSelected = activeStatus === tab.id;
             const hasCount = typeof tab.count === 'number' && tab.count > 0;
@@ -349,11 +349,16 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
                 key={tab.id}
                 type="button"
                 isPulseYellowWhite={isIncomingWithOrders}
-                onClick={() => {
+                onClick={(e) => {
                   setActiveStatus(tab.id);
                   setCurrentPage(1);
+                  e.currentTarget.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center',
+                  });
                 }}
-                className={`relative py-2 px-1 rounded-xl text-xs font-bold whitespace-nowrap transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 shrink-0 sm:shrink sm:w-full select-none ${
+                className={`relative py-2 px-3.5 sm:px-1 rounded-xl text-xs font-bold whitespace-nowrap transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 shrink-0 sm:shrink sm:w-full select-none ${
                   isIncomingWithOrders
                     ? 'font-black ring-1 ring-amber-400'
                     : isSelected
@@ -361,7 +366,7 @@ export const SellerOrdersTab: React.FC<SellerOrdersTabProps> = ({
                       : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-white/60 dark:hover:bg-zinc-700/50'
                 }`}
               >
-                <span className="truncate">{tab.label}</span>
+                <span className="whitespace-nowrap">{tab.label}</span>
 
                 {/* Badge count */}
                 <span

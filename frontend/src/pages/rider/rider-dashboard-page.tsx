@@ -17,7 +17,11 @@ import {
   MapPin,
   Zap,
 } from 'lucide-react';
-import { useGetMyRiderQuery } from '../../features/rider/api/rider.api';
+import {
+  useGetMyRiderQuery,
+  useGetCurrentOrderQuery,
+} from '../../features/rider/api/rider.api';
+import { useRiderSocket } from '../../features/rider/hooks/use-rider-socket';
 import { RiderAvailabilityToggle } from '../../features/rider/components/rider-availability-toggle';
 import { RiderProfileCard } from '../../features/rider/components/rider-profile-card';
 import { RiderEditModal } from '../../features/rider/components/rider-edit-modal';
@@ -44,6 +48,30 @@ export const RiderDashboardPage: React.FC = () => {
   const { data: rider, isLoading, error } = useGetMyRiderQuery();
   const [activeTab, setActiveTab] = useState<RiderDashboardTab>('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Persistent live order tracking and WebSocket connection across entire rider portal
+  const { data: currentOrderData } = useGetCurrentOrderQuery(undefined, {
+    pollingInterval: 15000,
+    skip: !rider?.isVerified,
+  });
+
+  const activeOrder = currentOrderData?.order;
+  const activeOrderId =
+    activeOrder?.orderId || (activeOrder as unknown as { id?: string })?.id;
+
+  const {
+    isMuted,
+    toggleMute,
+    incomingOrders,
+    dismissAlert,
+    isDelivering,
+  } = useRiderSocket({
+    riderId: rider?.id,
+    isAvailable: rider?.isAvailable,
+    enabled: Boolean(rider?.isVerified),
+    activeOrderId,
+    activeOrderStatus: activeOrder?.status,
+  });
 
   if (isLoading) {
     return (
@@ -155,6 +183,8 @@ export const RiderDashboardPage: React.FC = () => {
     );
   }
 
+  const totalOrdersCount = incomingOrders.length + (activeOrder ? 1 : 0);
+
   const TABS = [
     {
       id: 'profile' as const,
@@ -167,7 +197,7 @@ export const RiderDashboardPage: React.FC = () => {
       id: 'orders' as const,
       label: 'Live Dispatches',
       mobileLabel: 'Orders',
-      subtext: 'Active Deliveries',
+      subtext: isDelivering ? 'Live GPS Active' : 'Active Deliveries',
       icon: ShoppingBag,
     },
     {
@@ -249,6 +279,11 @@ export const RiderDashboardPage: React.FC = () => {
               >
                 <Icon className="w-4 h-4 shrink-0" />
                 <span className="truncate">{tab.mobileLabel}</span>
+                {tab.id === 'orders' && totalOrdersCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-black bg-orange-600 text-white">
+                    {totalOrdersCount}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -316,9 +351,16 @@ export const RiderDashboardPage: React.FC = () => {
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="text-xs block leading-tight truncate">
-                    {tab.label}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs block leading-tight truncate">
+                      {tab.label}
+                    </span>
+                    {tab.id === 'orders' && totalOrdersCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-orange-500 text-white">
+                        {totalOrdersCount}
+                      </span>
+                    )}
+                  </div>
                   <span
                     className={`text-[10px] block leading-tight truncate ${
                       isSelected ? 'text-white/80' : 'text-zinc-400'
@@ -331,6 +373,24 @@ export const RiderDashboardPage: React.FC = () => {
             );
           })}
         </div>
+
+        {/* Live GPS Broadcasting Indicator for Active Delivery */}
+        {isDelivering && (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-500/15 p-3 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">
+                Live GPS Active
+              </span>
+            </div>
+            <span className="text-[10px] uppercase font-black tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
+              Streaming
+            </span>
+          </div>
+        )}
 
         {/* Courier Performance Summary Card on Left Sidebar */}
         <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4 shadow-xs space-y-3">
@@ -489,6 +549,11 @@ export const RiderDashboardPage: React.FC = () => {
               <RiderOrdersTab
                 rider={rider}
                 onEditClick={() => setIsEditModalOpen(true)}
+                activeOrder={activeOrder}
+                incomingOrders={incomingOrders}
+                isMuted={isMuted}
+                toggleMute={toggleMute}
+                dismissAlert={dismissAlert}
               />
             </AnimatedTabContent>
           )}

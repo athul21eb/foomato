@@ -5,22 +5,30 @@ import type { OrderDetails } from '../../checkout/types/checkout.types';
 /**
  * Loads an image from a URL and converts it to a base64 data URL.
  */
-const loadImageAsBase64 = (url: string): Promise<string> => {
+const loadImageAsBase64 = (
+  url: string,
+): Promise<{ dataUrl: string; width: number; height: number }> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
+        const width = img.naturalWidth || img.width;
+        const height = img.naturalHeight || img.height;
+        canvas.width = width;
+        canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('Canvas 2D context unavailable'));
           return;
         }
         ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
+        resolve({
+          dataUrl: canvas.toDataURL('image/png'),
+          width,
+          height,
+        });
       } catch (err) {
         reject(err);
       }
@@ -65,15 +73,36 @@ export async function generateOrderReceiptPdf(order: OrderDetails): Promise<void
   let currentY = margin + 2;
 
   try {
-    const logoBase64 = await loadImageAsBase64('/foomato.png');
-    // Draw logo (width ~34mm, height proportional ~12mm)
-    doc.addImage(logoBase64, 'PNG', margin, currentY, 34, 11);
+    const { dataUrl, width, height } = await loadImageAsBase64('/foomato.png');
+    // Maintain exact aspect ratio to prevent squishing (square 1:1 icon)
+    const logoHeight = 12;
+    const aspect = width > 0 && height > 0 ? width / height : 1;
+    const logoWidth = logoHeight * aspect;
+
+    doc.addImage(dataUrl, 'PNG', margin, currentY, logoWidth, logoHeight);
+
+    // Modern branded typography next to the logo emblem
+    const textX = margin + logoWidth + 3.5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(234, 88, 12); // Foomato brand orange #EA580C
+    doc.text('FOOMATO', textX, currentY + 6.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(113, 113, 122); // Zinc 500
+    doc.text('Food & Delivery', textX, currentY + 11);
   } catch {
     // Elegant fallback text banner if image fails
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setTextColor(234, 88, 12); // Foomato brand orange #EA580C
-    doc.text('FOOMATO', margin, currentY + 8);
+    doc.text('FOOMATO', margin, currentY + 7);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(113, 113, 122);
+    doc.text('Food & Delivery', margin, currentY + 11.5);
   }
 
   // Right Header: Receipt & Order Meta

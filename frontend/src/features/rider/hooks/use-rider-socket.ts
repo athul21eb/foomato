@@ -13,12 +13,16 @@ interface UseRiderSocketOptions {
   riderId?: string;
   isAvailable?: boolean;
   enabled?: boolean;
+  activeOrderId?: string;
+  activeOrderStatus?: string;
 }
 
 export function useRiderSocket({
   riderId,
   isAvailable,
   enabled = true,
+  activeOrderId,
+  activeOrderStatus,
 }: UseRiderSocketOptions) {
   const dispatch = useAppDispatch();
   const authInfo = useAppSelector((state) => state.auth?.authInfo);
@@ -173,8 +177,63 @@ export function useRiderSocket({
     };
   }, [enabled, token, riderId, dispatch, playNotificationSound]);
 
+  const isDelivering =
+    Boolean(activeOrderId) &&
+    (activeOrderStatus === 'rider_assigned' || activeOrderStatus === 'picked_up');
+
+  // Live GPS broadcast: when rider is on duty and actively delivering an order
+  useEffect(() => {
+    if (!isDelivering || !isConnected || !socketRef.current) {
+      return;
+    }
+
+    if (!('geolocation' in navigator)) {
+      console.warn('Geolocation is not supported by this browser/device.');
+      return;
+    }
+
+    let lastLat = 0;
+    let lastLng = 0;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, heading, speed } = pos.coords;
+        if (
+          Math.abs(latitude - lastLat) < 0.000001 &&
+          Math.abs(longitude - lastLng) < 0.000001
+        ) {
+          return;
+        }
+        lastLat = latitude;
+        lastLng = longitude;
+
+        if (socketRef.current?.connected && activeOrderId) {
+          socketRef.current.emit('rider:location', {
+            orderId: activeOrderId,
+            coordinates: [longitude, latitude], // [lng, lat] GeoJSON format
+            heading: typeof heading === 'number' && !isNaN(heading) ? heading : 0,
+            speed: typeof speed === 'number' && !isNaN(speed) ? speed : 0,
+          });
+        }
+      },
+      (err) => {
+        console.warn('Rider geolocation watch error:', err.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000,
+      },
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [activeOrderId, activeOrderStatus, isConnected, isDelivering]);
+
   return {
     isConnected,
+    isDelivering,
     isMuted,
     toggleMute,
     incomingOrders: isAvailable ? incomingOrders : [],

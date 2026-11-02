@@ -98,6 +98,13 @@ function getStatusBadge(status: string) {
         pulse: true,
       };
     case 'rider_assigned':
+      return {
+        label: 'Rider Assigned',
+        className:
+          'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        dotColor: 'bg-amber-500',
+        pulse: true,
+      };
     case 'picked_up':
       return {
         label: 'Out for Delivery',
@@ -122,22 +129,17 @@ export const CustomerOrdersTab: React.FC<CustomerOrdersTabProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialOrderId = searchParams.get('orderId');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(
-    initialOrderId,
-  );
+  const selectedOrderId = searchParams.get('orderId');
 
   const [activeTab, setActiveTab] = useState<CustomerOrderFilterTab>('all');
   const [page, setPage] = useState<number>(1);
   const limit = 5;
 
   const handleSelectOrder = (orderId: string) => {
-    setSelectedOrderId(orderId);
     setSearchParams({ orderId }, { replace: true });
   };
 
   const handleBackToOrders = () => {
-    setSelectedOrderId(null);
     setSearchParams({}, { replace: true });
   };
 
@@ -316,9 +318,10 @@ export const CustomerOrdersTab: React.FC<CustomerOrdersTabProps> = ({
           <AnimatePresence mode="popLayout">
             {orders.map((order, idx) => {
               const badge = getStatusBadge(order.status);
+              const orderIdentifier = order.id || (order as unknown as { _id?: string })._id || '';
               const displayNum =
                 order.orderNumber ||
-                `#ORD-${order.id.slice(-6).toUpperCase()}`;
+                (orderIdentifier ? `#ORD-${orderIdentifier.slice(-6).toUpperCase()}` : '#ORD-REF');
          
               return (
                 <AnimatedOrderCard
@@ -433,14 +436,16 @@ export const CustomerOrdersTab: React.FC<CustomerOrdersTabProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleSelectOrder(order.id)}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-xs hover:bg-orange-500 dark:hover:bg-orange-500 dark:hover:text-white active:scale-95 transition-all shadow-xs cursor-pointer"
-                    >
-                      <span>View Order Details</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectOrder(order.id)}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-xs hover:bg-orange-500 dark:hover:bg-orange-500 dark:hover:text-white active:scale-95 transition-all shadow-xs cursor-pointer"
+                      >
+                        <span>View Details</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </AnimatedOrderCard>
               );

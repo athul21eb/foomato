@@ -1,19 +1,16 @@
 import React, { useEffect } from 'react';
-import { Outlet, useNavigate, useLocation, ScrollRestoration } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { Outlet, useNavigate, ScrollRestoration } from 'react-router-dom';
 import { Navbar } from '../components/common/navbar';
 import { Footer } from '../components/common/footer';
 import { useTheme } from '../context/use-theme';
 import { useAuth } from '../context/use-auth';
 import { useCart } from '../features/cart/hooks/useCart';
 import { LoadingScreen } from '../components/feedback/loading-screen';
-import { pageTransitionVariants } from '../lib/motion';
 
 export const RootLayout: React.FC = () => {
   const { theme } = useTheme();
   const { isAuthenticated, user, isLoading, isLoggingOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   // Automatically hydrates cart for authenticated customer
   useCart();
@@ -61,18 +58,7 @@ export const RootLayout: React.FC = () => {
       <Navbar />
 
       <main className="flex-1 flex flex-col">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={location.pathname}
-            variants={pageTransitionVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="flex-1 flex flex-col"
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <Outlet />
       </main>
 
       <Footer />

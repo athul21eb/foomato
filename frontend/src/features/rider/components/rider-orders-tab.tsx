@@ -16,7 +16,11 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import type { RiderProfile } from '../types/rider.types';
+import type {
+  RiderProfile,
+  RiderCurrentOrder,
+  IncomingOrderAlert,
+} from '../types/rider.types';
 import { RiderVerificationGuard } from './rider-verification-guard';
 import {
   FadeInUp,
@@ -41,11 +45,21 @@ import { toast } from 'sonner';
 interface RiderOrdersTabProps {
   rider: RiderProfile;
   onEditClick: () => void;
+  activeOrder?: RiderCurrentOrder | null;
+  incomingOrders?: IncomingOrderAlert[];
+  isMuted?: boolean;
+  toggleMute?: () => void;
+  dismissAlert?: (orderId: string) => void;
 }
 
 export const RiderOrdersTab: React.FC<RiderOrdersTabProps> = ({
   rider,
   onEditClick,
+  activeOrder: propActiveOrder,
+  incomingOrders: propIncomingOrders,
+  isMuted: propIsMuted,
+  toggleMute: propToggleMute,
+  dismissAlert: propDismissAlert,
 }) => {
   const [lng, lat] = rider.location?.coordinates || [0, 0];
   const hasCoordinates = !(lat === 0 && lng === 0);
@@ -59,21 +73,33 @@ export const RiderOrdersTab: React.FC<RiderOrdersTabProps> = ({
     'all' | 'incoming' | 'active' | 'completed'
   >('all');
 
-  const {
-    isMuted,
-    toggleMute,
-    incomingOrders,
-    dismissAlert,
-  } = useRiderSocket({
-    riderId: rider.id,
-    isAvailable: rider.isAvailable,
-    enabled: rider.isVerified,
-  });
-
+  // If activeOrder was not passed from parent dashboard, fetch it here as fallback
   const { data: currentOrderData } = useGetCurrentOrderQuery(undefined, {
     pollingInterval: 15000,
-    skip: !rider.isVerified,
+    skip: !rider.isVerified || propActiveOrder !== undefined,
   });
+
+  const activeOrder =
+    propActiveOrder !== undefined ? propActiveOrder : currentOrderData?.order;
+  const activeOrderId =
+    activeOrder?.orderId || (activeOrder as unknown as { id?: string })?.id;
+
+  // If socket controls were not passed from parent dashboard, initialize local fallback
+  const localSocket = useRiderSocket({
+    riderId: rider.id,
+    isAvailable: rider.isAvailable,
+    enabled: rider.isVerified && propIncomingOrders === undefined,
+    activeOrderId,
+    activeOrderStatus: activeOrder?.status,
+  });
+
+  const isMuted = propIsMuted !== undefined ? propIsMuted : localSocket.isMuted;
+  const toggleMute = propToggleMute || localSocket.toggleMute;
+  const incomingOrders =
+    propIncomingOrders !== undefined
+      ? propIncomingOrders
+      : localSocket.incomingOrders;
+  const dismissAlert = propDismissAlert || localSocket.dismissAlert;
 
   const { data: pastOrdersData } = useGetPastOrdersQuery(undefined, {
     skip: !rider.isVerified,
@@ -94,8 +120,6 @@ export const RiderOrdersTab: React.FC<RiderOrdersTabProps> = ({
       />
     );
   }
-
-  const activeOrder = currentOrderData?.order;
 
   const totalCount = incomingOrders.length + (activeOrder ? 1 : 0);
 

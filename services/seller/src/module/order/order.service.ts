@@ -315,6 +315,21 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
+    if (order.restaurantId) {
+      try {
+        const restaurant = await this.sellerService.findById(
+          order.restaurantId,
+        );
+        if (restaurant?.autoLocation) {
+          order.restaurantLocation = restaurant.autoLocation;
+        }
+      } catch (err: unknown) {
+        this.logger.warn(
+          `Could not attach restaurant location for order ${id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     return order;
   }
 

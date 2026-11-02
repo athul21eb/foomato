@@ -54,16 +54,13 @@ export const FadeInUp: React.FC<
   delay = 0,
   duration = 0.35,
   initialY = 18,
-  once = true,
-  margin = '-50px',
 }) => {
   return (
     <motion.div
       className={className}
       style={style}
       initial={{ opacity: 0, y: initialY }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once, margin }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{
         duration,
         delay,
@@ -90,15 +87,13 @@ export const SlideInBottom: React.FC<
   delay = 0.05,
   duration = 0.38,
   initialY = 24,
-  once = true,
 }) => {
   return (
     <motion.div
       className={className}
       style={style}
       initial={{ opacity: 0, y: initialY }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{
         duration,
         delay,
@@ -125,15 +120,13 @@ export const ScaleIn: React.FC<
   delay = 0,
   duration = 0.32,
   initialScale = 0.96,
-  once = true,
 }) => {
   return (
     <motion.div
       className={className}
       style={style}
       initial={{ opacity: 0, scale: initialScale }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      viewport={{ once }}
+      animate={{ opacity: 1, scale: 1 }}
       transition={{
         duration,
         delay,
@@ -435,7 +428,7 @@ export interface AnimatedStatusTabProps {
   children: React.ReactNode;
   className?: string;
   isPulseYellowWhite?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   type?: 'button' | 'submit' | 'reset';
 }
 
@@ -850,6 +843,97 @@ export const AnimatedVerificationCard: React.FC<{
       transition={{
         duration: 0.45,
         ease: [0.16, 1, 0.3, 1],
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 27. AnimatedTrackingRadar — Pulsing concentric circles for real-time live GPS broadcast indicators.
+ */
+export const AnimatedTrackingRadar: React.FC<{
+  className?: string;
+  size?: 'sm' | 'md';
+}> = ({ className = '', size = 'md' }) => {
+  const outerSize = size === 'sm' ? 'w-5 h-5' : 'w-7 h-7';
+  const innerSize = size === 'sm' ? 'w-2 h-2' : 'w-2.5 h-2.5';
+
+  return (
+    <div className={`relative flex items-center justify-center ${outerSize} ${className}`}>
+      <motion.span
+        animate={{
+          scale: [1, 2.2, 1],
+          opacity: [0.75, 0, 0.75],
+        }}
+        transition={{
+          duration: 2.2,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        className="absolute inset-0 rounded-full bg-emerald-500/30 dark:bg-emerald-400/30"
+      />
+      <motion.span
+        animate={{
+          scale: [1, 1.6, 1],
+          opacity: [0.9, 0.2, 0.9],
+        }}
+        transition={{
+          duration: 2.2,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 0.4,
+        }}
+        className="absolute inset-1 rounded-full bg-emerald-500/40 dark:bg-emerald-400/40"
+      />
+      <span className={`relative rounded-full bg-emerald-500 dark:bg-emerald-400 shadow-sm shadow-emerald-500/50 ${innerSize}`} />
+    </div>
+  );
+};
+
+/**
+ * 28. AnimatedTrackingStep — Interactive timeline step container with entry bounce.
+ */
+export const AnimatedTrackingStep: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+  isActive?: boolean;
+  delay?: number;
+}> = ({ children, className = '', isActive = false, delay = 0 }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{
+        duration: 0.35,
+        delay,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      className={`relative ${className} ${isActive ? 'scale-[1.01]' : ''}`}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/**
+ * 29. AnimatedEtaCounter — Smooth badge entrance for live delivery ETA.
+ */
+export const AnimatedEtaCounter: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => {
+  return (
+    <motion.div
+      initial={{ scale: 0.92, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.92, opacity: 0 }}
+      transition={{
+        type: 'spring',
+        stiffness: 400,
+        damping: 25,
       }}
       className={className}
     >

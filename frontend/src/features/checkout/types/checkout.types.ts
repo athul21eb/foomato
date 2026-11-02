@@ -26,6 +26,11 @@ export interface OrderDetails {
   userId: string;
   restaurantId: string;
   restaurantName: string;
+  restaurantLocation?: {
+    type?: string;
+    coordinates: [number, number];
+    formattedAddress?: string;
+  };
   riderId?: string | null;
   riderName?: string | null;
   riderPhone?: number | null;

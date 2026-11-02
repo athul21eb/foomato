@@ -185,7 +185,7 @@ export const OrderSuccessPage: React.FC = () => {
           {/* ========================================================= */}
           <div className="lg:col-span-7 xl:col-span-7 space-y-6">
             {/* Celebration Hero Card */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-white to-orange-50/40 dark:from-zinc-900 dark:via-zinc-900 dark:to-orange-950/20 border border-zinc-200/80 dark:border-zinc-800/80 p-6 sm:p-8 backdrop-blur-md shadow-xl shadow-zinc-900/5">
+            <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-white via-white to-orange-50/40 dark:from-zinc-900 dark:via-zinc-900 dark:to-orange-950/20 border border-zinc-200/80 dark:border-zinc-800/80 p-6 sm:p-8 backdrop-blur-md shadow-xl shadow-zinc-900/5">
               {/* Background ambient glow circle */}
               <div
                 className="absolute -top-24 -right-24 w-64 h-64 bg-orange-500/10 dark:bg-orange-500/5 rounded-full blur-3xl pointer-events-none"
@@ -199,7 +199,7 @@ export const OrderSuccessPage: React.FC = () => {
                     initial={{ scale: 0.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={springBouncy}
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 ring-8 ring-emerald-500/15"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-linear-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 ring-8 ring-emerald-500/15"
                   >
                     <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" />
                   </motion.div>
@@ -216,7 +216,7 @@ export const OrderSuccessPage: React.FC = () => {
                 {/* Hero Headings & Meta */}
                 <div className="space-y-2 flex-1">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    <Check className="w-3 h-3 stroke-[3]" />
+                    <Check className="w-3 h-3 stroke-3" />
                     <span>Payment Confirmed</span>
                   </div>
 
@@ -389,7 +389,7 @@ export const OrderSuccessPage: React.FC = () => {
 
               {/* Itemized Dishes List */}
               <div className="p-5 sm:p-6 space-y-4">
-                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-75 overflow-y-auto pr-1">
                   {items.map((item, idx) => {
                     const quantity = item.quantity || item.quauntity || 1;
                     const itemTotal = item.price * quantity;
@@ -463,7 +463,7 @@ export const OrderSuccessPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+                      <span className="text-xl sm:text-2xl font-black bg-linear-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
                         {formatCurrency(order?.totalAmount || 0)}
                       </span>
                     </div>
@@ -474,10 +474,10 @@ export const OrderSuccessPage: React.FC = () => {
               {/* Action Buttons Section */}
               <div className="p-5 sm:p-6 bg-zinc-50/70 dark:bg-zinc-800/40 border-t border-zinc-200/70 dark:border-zinc-800/70 space-y-3">
                 <Link
-                  to="/account"
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl text-xs sm:text-sm font-black bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-98 transition-all cursor-pointer text-center"
+                  to={order?.id ? `/account?orderId=${order.id}` : '/account'}
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl text-xs sm:text-sm font-black bg-linear-to-r from-orange-500 via-orange-600 to-amber-500 text-white shadow-lg shadow-orange-500/25 hover:brightness-110 active:scale-98 transition-all cursor-pointer text-center"
                 >
-                  <span>Track in My Orders</span>
+                  <span>Track Live Delivery</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
 

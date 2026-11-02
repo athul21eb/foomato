@@ -115,6 +115,10 @@ export const router = createBrowserRouter([
         element: withSuspense(OrderDetailsPage),
       },
       {
+        path: 'orders/:id/track',
+        element: withSuspense(OrderDetailsPage),
+      },
+      {
         path: 'address',
         element: withSuspense(AddressPage),
       },

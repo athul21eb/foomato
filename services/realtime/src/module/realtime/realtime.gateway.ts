@@ -174,6 +174,86 @@ export class RealtimeGateway
     }
   }
 
+  private readonly riderLocationCache = new Map<
+    string,
+    {
+      orderId: string;
+      coordinates: [number, number]; // [lng, lat]
+      heading?: number;
+      speed?: number;
+      updatedAt: number;
+    }
+  >();
+
+  @SubscribeMessage('join:order')
+  handleJoinOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId?: string },
+  ): void {
+    const orderId = data?.orderId?.trim();
+    if (!orderId) return;
+
+    const room = `order:${orderId}`;
+    void client.join(room);
+    this.logger.log(`Client [${client.id}] joined order room: ${room}`);
+
+    // If we have cached last-known coordinates for this order, emit immediately to this client
+    const cached = this.riderLocationCache.get(orderId);
+    if (cached && Date.now() - cached.updatedAt < 5 * 60 * 1000) {
+      client.emit('order:rider:location', cached);
+    }
+  }
+
+  @SubscribeMessage('leave:order')
+  handleLeaveOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId?: string },
+  ): void {
+    const orderId = data?.orderId?.trim();
+    if (!orderId) return;
+
+    const room = `order:${orderId}`;
+    void client.leave(room);
+    this.logger.log(`Client [${client.id}] left order room: ${room}`);
+  }
+
+  @SubscribeMessage('rider:location')
+  handleRiderLocation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      orderId?: string;
+      coordinates?: [number, number]; // [lng, lat]
+      heading?: number;
+      speed?: number;
+    },
+  ): void {
+    const orderId = data?.orderId?.trim();
+    if (
+      !orderId ||
+      !data?.coordinates ||
+      !Array.isArray(data.coordinates) ||
+      data.coordinates.length < 2
+    ) {
+      return;
+    }
+
+    const payload = {
+      orderId,
+      coordinates: data.coordinates as [number, number],
+      heading: typeof data.heading === 'number' ? data.heading : 0,
+      speed: typeof data.speed === 'number' ? data.speed : 0,
+      updatedAt: Date.now(),
+    };
+
+    // Cache in-memory for instant client hydration on refresh
+    this.riderLocationCache.set(orderId, payload);
+
+    // Broadcast to the order room
+    const room = `order:${orderId}`;
+    this.server.to(room).emit('order:rider:location', payload);
+  }
+
   @SubscribeMessage('join:room')
   handleJoinRoom(
     @ConnectedSocket() client: Socket,

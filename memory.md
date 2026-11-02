@@ -198,6 +198,36 @@ Last updated: 2026-10-14T01:38:00+05:30
 - **Single Canonical Route Architecture**:
   - Eliminated all route aliases and array paths across all microservices (`auth`, `seller`, `utils`, `realtime`, `rider`). Standardized on single, unambiguous RESTful routes. Codified in `AGENTS.md`.
 
+- **PDF Receipt Logo & Branding Fix (`frontend/src`)**:
+  - In [order-receipt-pdf.ts](file:///home/athul/2026_grinding/foomato/frontend/src/features/customer/utils/order-receipt-pdf.ts), fixed severe logo aspect ratio distortion where the square 512x512 app icon (`/foomato.png`) was previously forced into a 34x11mm box (~3:1 aspect ratio), flattening the logo.
+  - Refactored `loadImageAsBase64` to return image natural dimensions (`width`, `height`).
+  - Constrained logo rendering to natural 1:1 square proportions (`logoHeight = 12`, `logoWidth = 12`), paired with official brand typography: bold brand orange `FOOMATO` and `Food & Delivery` subtitle, matching web navigation aesthetics and aligning with right-side tax invoice metadata.
+
+- **Seller Dashboard Mobile Tab Scrollability Fix (`frontend/src`)**:
+  - In [seller-orders-tab.tsx](file:///home/athul/2026_grinding/foomato/frontend/src/features/seller/components/seller-orders-tab.tsx), resolved cramped and cut-off status tabs on mobile viewports:
+    - Removed `truncate` on tab labels (`whitespace-nowrap`), preventing "Completed" from truncating into "Coi...".
+    - Added comfortable touch padding (`px-3.5 sm:px-1`) and horizontal touch panning (`overscroll-x-contain touch-pan-x`).
+    - Added sleek `custom-scrollbar` with bottom padding (`pb-1 sm:pb-0`) to provide clear visual scroll affordance on mobile while preserving clean desktop grid presentation (`sm:grid sm:grid-cols-7`).
+    - Enabled automatic smooth centering on tap via `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })`.
+    - In [animations.tsx](file:///home/athul/2026_grinding/foomato/frontend/src/lib/animations.tsx), updated `AnimatedStatusTabProps` to accept mouse event parameter for `scrollIntoView`.
+
+- **Customer Order Tracking & Account Page Refinements (`frontend/src`)**:
+  - **Embedded Live Tracking into Order Details**: Removed redundant standalone tracking page (`order-tracking-page.tsx`) and routed `/order/:id` directly into the unified customer order detail view inside `/account?orderId=:id`.
+  - **Blank Page Root Cause Fix**:
+    - Identified that `AnimatePresence mode="wait"` in `frontend/src/layouts/root-layout.tsx` was intercepting dynamic route changes/redirects and freezing `<Outlet />` without mounting child routes, resulting in a blank black screen under the Navbar.
+    - Removed `AnimatePresence mode="wait"` and the raw `motion.div` from `root-layout.tsx`, restoring reliable route mounting and complying with the repo animation standard in `AGENTS.md`.
+    - Added defensive fallbacks for `order.id` in `customer-order-detail-view.tsx` and `customer-orders-tab.tsx` (`orderIdentifier = order.id || order._id || ''`) to prevent runtime `.slice()` TypeErrors.
+    - Added `useEffect` in `customer-orders-tab.tsx` to keep `selectedOrderId` synchronized with `searchParams.get('orderId')`.
+  - **Rider Polyline & Map Visibility Rules**:
+    - Live road tracking map in [live-tracking-map.tsx](file:///home/athul/2026_grinding/foomato/frontend/src/features/customer/components/live-tracking-map.tsx) only displays after a rider accepts the order (`status === 'rider_assigned'` or `'picked_up'`).
+    - Milestone stepper only activates "Out for Delivery" on `status === 'picked_up'` (food picked up by rider).
+    - Compacted rider icon to a 26px disc centered on the road polyline (`findClosestPointOnRoute`) and rendered the yellow polyline strictly from rider position to delivery destination. Removed dev simulation controls.
+  - **Live GPS Emission & Chrome Sensors Dev Bridge**:
+    - Identified why DevTools Sensors was not moving the rider: neither the rider dashboard nor the customer view was watching `navigator.geolocation.watchPosition`, and Chrome Sensors only changes geolocation on the specific attached browser tab.
+    - Implemented active GPS streaming in [use-rider-socket.ts](file:///home/athul/2026_grinding/foomato/frontend/src/features/rider/hooks/use-rider-socket.ts) and [rider-orders-tab.tsx](file:///home/athul/2026_grinding/foomato/frontend/src/features/rider/components/rider-orders-tab.tsx) during active delivery (`rider_assigned` / `picked_up`).
+    - Added a Dev Sensor Bridge in [use-order-tracking.ts](file:///home/athul/2026_grinding/foomato/frontend/src/features/customer/hooks/use-order-tracking.ts) (`import.meta.env.DEV`), enabling single-window testing where changing Chrome DevTools "Sensors" directly on the customer tab emits `rider:location` and smoothly moves the rider marker.
+    - In [live-tracking-map.tsx](file:///home/athul/2026_grinding/foomato/frontend/src/features/customer/components/live-tracking-map.tsx), added auto-pan when reported coordinates are outside the current viewport, and tuned road-snapping to snap within 2km while preserving coordinates during wide testing.
+
 ## Current state
 
 - `frontend`: `pnpm run build` (`tsc -b && vite build`) passes with 0 errors.
@@ -209,4 +239,5 @@ Last updated: 2026-10-14T01:38:00+05:30
 
 ## Next session starts with
 
-- Customer live order tracking screen and Rider portal live order acceptance matching the new `order:available` socket event.
+- Rider portal live GPS emission testing and delivery completion flow verification.
+
